@@ -1,0 +1,30 @@
+Notes about how Curses works (extracted from worm lab)
+#include <curses.h> <-it has key bindings, also is Curses
+
+adding characters to the screen uses addch, takes param, enum of the character, or mvaddch which takes y value (row) x value (column) and then again enum of a character
+
+screen is a 2d array with rows (screen_row) and columns (screen_column), both 2 off from initial row (need to add 2)
+
+we will be responsible for figuring out how to scroll, curses seems to from examples, be able to easily scroll down when runs out of space. seems to conform to initial terminal size.
+^found by looking @ p2p
+
+refresh(); can be used to update display
+
+drawing a display can be a constant while loop, but maybe could be more static since we're not trying to animate
+
+reading characters saves them as integers
+
+start curses with the line WINDOW* mainwin = initscr();
+
+keypad(mainwin, true) allows at least arrow keys, maybe all keys (probably need to do something similar for having mouse support)
+nodelay(mainwin, true) supports non blocking keyboard access
+delwin(mainwin) cleans window
+endwin() closes window
+
+tdlop.org/HOWTO/NCURSES-Programming-HOWNTO/forms.html <-curses for P2P based on first example here
+
+https://www.gnu.org/software/guile-ncurses/manual/html_node/Reading-and-writing-a-curses-screen-to-a-file.html <-putting the file on the screen, saving it back
+https://www.gnu.org/software/guile-ncurses/manual/html_node/Scroll-a-window.html#Scroll-a-window <-how to make the window scroll
+https://www.gnu.org/software/guile-ncurses/manual/html_node/Refresh-windows-and-lines.html#Refresh-windows-and-lines <-refreshing windows and lines, will need more on this
+
+
