@@ -27,4 +27,11 @@ https://www.gnu.org/software/guile-ncurses/manual/html_node/Reading-and-writing-
 https://www.gnu.org/software/guile-ncurses/manual/html_node/Scroll-a-window.html#Scroll-a-window <-how to make the window scroll
 https://www.gnu.org/software/guile-ncurses/manual/html_node/Refresh-windows-and-lines.html#Refresh-windows-and-lines <-refreshing windows and lines, will need more on this
 
+tdlop.org/HOWTO/NCURSES-Programming-HOWNTO/mouse.html <-mouse support in Curses (also useful for ctrl-S or any ctrl command).
+
+putting lines in: use instr to read text currently in window, clrtoel to erase it (leaving a blank line), and addstr to put the erased content one line down. insert would move us up, and this would not support inserts in the middle of lines but something to start with? (from stack overflow called add-a-line-in-ncurses)
+
+do we want to have a cursor? if so, how?
+
+STILL TO FIND OUT: how to sychronize windows: could repeatedly save to disc and reload, and make sure contents of window are in sync with file on disc. Could also involve clients having local copies that get used to push changes to a main. <-Leah's suggestion
 
