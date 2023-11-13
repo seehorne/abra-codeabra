@@ -34,4 +34,4 @@ putting lines in: use instr to read text currently in window, clrtoel to erase i
 do we want to have a cursor? if so, how?
 
 STILL TO FIND OUT: how to sychronize windows: could repeatedly save to disc and reload, and make sure contents of window are in sync with file on disc. Could also involve clients having local copies that get used to push changes to a main. <-Leah's suggestion
-
+^ to this, our locks would probably work best if its all writing to one file, not copies, otherwise we'll get a merge conflict-esque thing
