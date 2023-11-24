@@ -23,6 +23,13 @@ This project is a collaborative code editor that can be run on Mathlan.
 </ul>
 
 ### file requirements
-<p> The collaborative code editor supports editing for documents with at most 40 lines, with lines of at most 100 characters each. Please take care to ensure files you edit with collaborative-code-editor meet these requirements. <strong>Any lines over 40 will be truncated from the file, as will any line contents past 100 characters.</strong></p>
+<ul>
+<li> The collaborative code editor supports editing for documents with at most 40 lines, with lines of at most 100 characters each. Please take care to ensure files you edit with collaborative-code-editor meet these requirements.
+  <ul><li> <strong>Any lines over 40 will be truncated from the file, as will any line contents past 100 characters.</strong></li>
+  <li>Additionally, code with lines shorter that 100 characters will have lines padded with spaces up to 100 characters, and code with under 40 lines will have lines of spaces added up to 40 lines. If this kind of whitespace impacts the code you write, please be aware of this behavior.</li></ul>
+</li>
+  <li>Files are required to be able to be represented exclusively by editable text. Behavior for files that do not meet this requirement, such as PDFs, jpgs, and mp3s, is not defined and will not be handled.</li>
+  <li>Files are not required to exist before the program runs. If the filepath provided does not lead to a real file, the file will be created in that location, and a blank file will be loaded in the editor. </li>
+</ul>
 
 
