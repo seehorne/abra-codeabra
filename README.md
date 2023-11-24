@@ -3,7 +3,7 @@ Grinnell College CSC-213 Fall '23 Final Project
 ## description
 This project is a collaborative code editor that can be run on Mathlan.
 ## general use
-### how to run
+### how to interact
 <ul>
   <li>To compile this program, type <code>make main</code> in your terminal.</li>
   <li>To run this program, use one of the following two command line prompts:
