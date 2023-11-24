@@ -35,7 +35,7 @@ typedef struct file_rep {
 typedef struct thread_file_package{
     locking_file_t* document; //<writable stream
     file_rep_t* representation; //<data structure with file contents
-}
+} thread_file_package_t;
 
 file_rep_t* our_file; //global struct to contain the file representation
 
