@@ -7,6 +7,9 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <string.h>
+#include <form.h>
+#include "ui.h"
 
 #define MAX_LINE_LENGTH 101 //100 chars plus a newline
 #define MAX_LINE_COUNT 40
@@ -41,18 +44,70 @@ file_rep_t* our_file; //global struct to contain the file representation
 
 locking_file_t* real_file; //global struct to contain the actual file
 
+
+void draw_form() {//TODO: give this params bc threads will need it//doesn't actually use forms yet
+    initscr();  // Initialize ncurses
+    cbreak();
+    //noecho();
+    int row, col;
+    //getmaxyx(stdscr, row, col);
+    WINDOW *form = newwin(MAX_LINE_COUNT+3, MAX_LINE_LENGTH+3, 1, 1);
+    nodelay(form, true);
+    keypad(form, true);
+    box(form, 0, 0);
+    for (int i = 0; i < MAX_LINE_COUNT; i++) {
+        char line_copy[MAX_LINE_LENGTH];
+        memcpy(line_copy,our_file->contents[i].line_contents, MAX_LINE_LENGTH);
+        line_copy[MAX_LINE_LENGTH-1]='\0'; //replace the newline with null terminator
+        mvwprintw(form, i + 1, 1, "%s", line_copy);
+    }
+    wrefresh(form);
+    post_form(form);
+
+   int ch;
+    do {//if you copy this part out the form shows up
+        ch = getch();
+        //wrefresh(form);
+    } while (ch != 'q');//this works but WHERE TF IS THE FORM
+
+    endwin();
+}
+
+
+/**
+
+* This function is run whenever the user hits enter after typing a message
+
+* Sends the message to the original sender's connection
+
+* \param message the message typed in from the user interaction pane
+
+**/
+
+void input_callback(const char* message) {
+  if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0) {
+    ui_exit();
+  } else {
+    ui_display(username, message);
+  }
+}
+
+
 int main(int argc, char **argv){
+    //ui_init(input_callback);
     bool pre_existing = true;
     our_file = malloc(sizeof(file_rep_t));
     real_file = malloc(sizeof(locking_file_t));
     pthread_mutex_init(&real_file->file_lock, NULL);
-    if (argc == 3){ //run program, username, and filename
+
+    if(argc != 3 && argc !=4){
+        fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>]\n", argv[0], argv[0]);
+    }
+    if (argc == 3){ //setup for session host. run program, username, and filename
         username = argv[1];
         filename = argv[2];
-    }
     // TODO:  ncurses 
     //O_CREAT | O_RDWR| O_EXCL
-    
     //read the specified file into the data structure
     chmod(filename, 00777);//set rwx to good for everyone (if it exists, this doesn't do anything otherwise)
     real_file->file_ref = fopen(filename, "r+");//tries to open the file (does not overwrite)
@@ -97,6 +152,24 @@ int main(int argc, char **argv){
         }
     }
     fseek(real_file->file_ref, 0, SEEK_SET); //puts the pointer back at the start of the file
-    fclose(real_file->file_ref);
+    // WINDOW* mainwin = initscr();
+    // fclose(real_file->file_ref);
+    // if (mainwin == NULL) {
+    //     fprintf(stderr, "Error initializing ncurses.\n");
+    //     exit(2);
+    // }
+    // printw("Hello world!");
+    // refresh();
+    // for (int i = 0; i < MAX_LINE_COUNT; i++){
+    //     printw("|\n");
+    //     refresh();
+    // }
+    // sleep(1000);
+    // endwin();
+    }
+    if (argc == 4){//connecting to editing session
+        //TODO: set up connection
+    }
+    draw_form();
     return 0;
 } 
