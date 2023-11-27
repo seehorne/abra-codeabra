@@ -46,6 +46,8 @@ locking_file_t* real_file; //global struct to contain the actual file
 
 WINDOW* ui_win;
 
+//int string_to
+
 char* int_to_string(int i){
     char* return_val = malloc((sizeof(char)*2));
     int tens_place = i / 10;
@@ -95,15 +97,20 @@ void write_contents(){
 }
 
 void overwrite_line(){
+    FILE* log = fopen("log.txt", "w+");
+    fprintf(log, "we can write\n");
+    fflush(log);
     char c = getch();
     int i = 0;
     char line_num_rep[3];//make a char array of 2 slots for storing the line number
     line_num_rep[2]='\0';
     while (c != '\n'){
+        if (c != ERR){
         if (i < 2){
         line_num_rep[i]= c;
         }
         i++;
+        }
         c = getch();
     }
     if (i == 0){
@@ -113,30 +120,56 @@ void overwrite_line(){
     if (i == 1){//only one digit long
         line_num_rep[i]='\0';//end the string early
     }
-    int line_num = atoi(line_num_rep)-1;//transform the line number rep to the index of the array
+    int line_num = atoi((const char*)line_num_rep)-1;//transform the line number rep to the index of the array
     //TODO: set the owner field of the line here
-    char overwriting = getch();
+    fprintf(log, "line we read: %d)\n", line_num);
+    fflush(log);
+    //char overwrite_buf[MAX_LINE_LENGTH-1];
+    char overwriting = getch();//works fine
     i = 0; //reset the index overwriter
     while (overwriting != '\n'){
+        if (overwriting != ERR){
+            fprintf(log, "char we allegedly read: %c\n", overwriting);
+            fflush(log);
         if (i < MAX_LINE_LENGTH-1){
-            our_file->contents[line_num].line_contents[i]=overwriting;
+            our_file->contents[line_num].line_contents[i]=overwriting;//we did not save somehow. fuck.
+            // overwrite_buf[i]=overwriting;
+            // fprintf(log, "new buffer content new: %c\n", overwriting);
+            // fflush(log);
         }
         i++;
-        overwriting = getch();
+        fprintf(log, "reading char: %c\n", our_file->contents[line_num].line_contents[i]);//fprintf for log file
+        fflush(log);
+        }
+        overwriting = getch();// works fine
     }
     while (i < MAX_LINE_LENGTH-1){
         our_file->contents[line_num].line_contents[i]=' '; //pad with spaces again
+        i++;
     }
-    fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_SET);//go to the right line in the file
-    fwrite(our_file->contents[line_num].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed
+    our_file->contents[line_num].line_contents[MAX_LINE_LENGTH-1]='\0';
+    fprintf(log, "read line: %s\n", our_file->contents[line_num].line_contents);
+    fflush(log);
+    our_file->contents[line_num].line_contents[MAX_LINE_LENGTH-1]='\n';
+    fseek(real_file->file_ref, 0, SEEK_SET);
+    fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
+    // real_file->file_ref += (line_num * MAX_LINE_LENGTH);
+    fwrite(our_file->contents[line_num].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed (all but newline)
+    // for (int i = 0; i < MAX_LINE_LENGTH-1; i++){
+    //     *real_file->file_ref = our_file->contents[line_num].line_contents[i];
+    //     real_file->file_ref++;
+    // }
+    //real_file->file_ref -= (line_num * MAX_LINE_LENGTH)+99;//put us back
     fseek(real_file->file_ref, 0, SEEK_SET);//put the cursor back at the top of the file
     int to_row = line_num+1; //+1 to undo the subtraction from indexing
     for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
         mvaddch(to_row, col, our_file->contents[line_num].line_contents[col-3]);
+        wrefresh(ui_win);
     }
-    refresh();
+    wrefresh(ui_win);
     move(0,0);//put the cursor back at the top
-    refresh();
+    wrefresh(ui_win);
+    fclose(log);
 }
 
 // void draw_form() {//TODO: give this params bc threads will need it//doesn't actually use forms yet
@@ -270,11 +303,17 @@ int main(int argc, char **argv){
     if (argc == 4){//connecting to editing session
         //TODO: set up connection
     }
-    ui_init(ui_win);
+    //ui_init(ui_win);
+    ui_win = initscr();
+    keypad(ui_win, true);   // Support arrow keys
+    //nodelay(ui_win, true);  // Non-blocking keyboard access
+    mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do  
     write_contents();
     //draw_form();
     while(true){
         overwrite_line();
     }
+    fclose(real_file->file_ref);
+    endwin();
     return 0;
 } 
