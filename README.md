@@ -16,7 +16,7 @@ This project is a collaborative code editor that can be run on Mathlan.
         <li> Contact your session host to determine this machine and the session socket</li>
       </ul>
   </ol></li>
-  <li> To leave this program, (we should figure out how to leave)
+  <li> To leave this program, type :q where you would normally type the line number
     <ul><li>If you are the session host and you leave, everyone gets kicked out.</li>
       <li>If you are not the session host, you leaving does not impact the session.</li></ul>
   </li>
