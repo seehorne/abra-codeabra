@@ -16,7 +16,7 @@
 // #define SCREEN_WIDTH 100
 
 #define MAX_LINE_COUNT 40
-#define MAX_LINE_LENGTH 101
+#define MAX_LINE_LENGTH 100 //we don't care about newlines here
 
 
 
@@ -45,309 +45,403 @@
 // FORM* display_form;
 
 
-// The fields array for the input form
-
-FIELD* input_fields[41];
-
-
-// The form that holds the input field
-
-FORM* input_form;
-
-
-// The handle for the UI thread
-
-pthread_t ui_thread;
-
-
-// A lock to protect the entire UI
-
-pthread_mutexattr_t ui_lock_attr;
-
-pthread_mutex_t ui_lock;
-
-
-// The callback function to run on new input
-
-static input_callback_t input_callback;
-
-
-// When true, the UI should continue running
-
-bool ui_running = false;
-
-
-/**
-
- * Initialize the user interface and set up a callback function that should be
-
- * called every time there is a new message to send.
-
- *
-
- * \param callback  A function that should run every time there is new input.
-
- *                  The string passed to the callback should be copied if you
-
- *                  need to retain it after the callback function returns.
-
- */
-
-void ui_init(input_callback_t callback) {
-
-  // Initialize curses
-
+void ui_init(WINDOW* win){
   initscr();
+  win = newwin(MAX_LINE_COUNT+3, MAX_LINE_LENGTH+3, 1, 1);
+  //noecho();                // Don't print keys when pressed
+  keypad(win, true);   // Support arrow keys
+  nodelay(win, true);  // Non-blocking keyboard access
+  mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do   
+}
 
-  cbreak();
-
-  noecho();
-
-  curs_set(0);
-
-  timeout(INPUT_TIMEOUT_MS);
-
-  keypad(stdscr, TRUE);
-
-
-  // Get the number of rows and columns in the terminal display
-
-  int rows = 1;
-
-  int cols = 100;
-
-  //getmaxyx(stdscr, rows, cols);  // This uses a macro to modify rows and cols
-
-
-  // Calculate the height of the display field
-
-  //int display_height = rows - INPUT_HEIGHT - 1;
-
-
-  // Create the larger message display window
-
-  // height, width, start row, start col, overflow buffer lines, buffers
-
-//   display_fields[0] = new_field(display_height, cols, 0, 0, 0, 0);
-
-//   display_fields[1] = NULL;
-
-
-  // Create the input field
-
-//   input_fields[0] = new_field(INPUT_HEIGHT, cols, display_height + 1, 0, 0, 0);
-
-//   input_fields[1] = NULL;
-
-    for (int i = 0; i < MAX_LINE_COUNT; i++){
-        input_fields[i] = new_field(INPUT_HEIGHT, cols, i, 0, 0, 0); //trying to make 40 input fields
-        field_opts_off(input_fields[i], O_AUTOSKIP & O_WRAP);
-    }
-    input_fields[40] = NULL;
-
-  // Grow the display field buffer as needed
-
-//   field_opts_off(display_fields[0], O_STATIC);
-
-
-  // Don't advance to the next field automatically when using the input field
-
-//   field_opts_off(input_fields[0], O_AUTOSKIP);
-
-
-//   // Turn off word wrap (nice, but causes other problems)
-
-//   field_opts_off(input_fields[0], O_WRAP);
-
-//   field_opts_off(display_fields[0], O_WRAP);
-
-
-  // Create the forms
-
-//   display_form = new_form(display_fields);
-
-  input_form = new_form(input_fields);
-
-
-  // Display the forms
-
-  //post_form(display_form);
-
-  post_form(input_form);
-
-  refresh();
-
-
-//   // Draw a horizontal split
-
-//   for (int i = 0; i < cols; i++) {
-
-//     mvprintw(display_height, i, "-");
-
+// void display_init(WINDOW* win, file_rep_t* content){
+//   int row = 0;
+//   int col = 0;
+//   for (; col < MAX_LINE_COUNT; col++){
+//     for (; row < MAX_LINE_LENGTH; row++){
+//       mvaddch(row, col, content->contents[row].line_contents[col]);
+//     }
 //   }
+//   refresh();
+// }
+
+void ui_run(){
+
+}
+
+void ui_display(const char* username, const char* message){
+
+}
+
+void ui_exit(){
+
+}
 
 
-//   // Update the display
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//ui of p2p
+// // The fields array for the input form
+
+// FIELD* input_fields[41];
+
+
+// // The form that holds the input field
+
+// FORM* input_form;
+
+
+// // The handle for the UI thread
+
+// pthread_t ui_thread;
+
+
+// // A lock to protect the entire UI
+
+// pthread_mutexattr_t ui_lock_attr;
+
+// pthread_mutex_t ui_lock;
+
+
+// // The callback function to run on new input
+
+// static input_callback_t input_callback;
+
+
+// // When true, the UI should continue running
+
+// bool ui_running = false;
+
+
+// /**
+
+//  * Initialize the user interface and set up a callback function that should be
+
+//  * called every time there is a new message to send.
+
+//  *
+
+//  * \param callback  A function that should run every time there is new input.
+
+//  *                  The string passed to the callback should be copied if you
+
+//  *                  need to retain it after the callback function returns.
+
+//  */
+
+// // void draw_form(, int num_lines) {
+// //     initscr();  // Initialize ncurses
+// //     cbreak();
+// //     noecho();
+
+// //     int row, col;
+// //     getmaxyx(stdscr, row, col);
+
+// //     WINDOW *form = newwin(row - 2, col - 2, 1, 1);
+// //     box(form, 0, 0);
+
+// //     for (int i = 0; i < num_lines; i++) {
+// //         mvwprintw(form, i + 1, 1, "%s", lines[i]);
+// //     }
+
+// //     wrefresh(form);
+
+// //     getch();  // Wait for user input
+// //     endwin(); // End ncurses
+// // }
+
+
+// void ui_init(input_callback_t callback) {
+
+//   // Initialize curses
+
+//   initscr();
+
+//   cbreak();
+
+//   noecho();
+
+//   curs_set(0);
+
+//   timeout(INPUT_TIMEOUT_MS);
+
+//   keypad(stdscr, TRUE);
+
+
+//   // Get the number of rows and columns in the terminal display
+
+//   int rows = 1;
+
+//   int cols = 100;
+
+//   //getmaxyx(stdscr, rows, cols);  // This uses a macro to modify rows and cols
+
+
+//   // Calculate the height of the display field
+
+//   //int display_height = rows - INPUT_HEIGHT - 1;
+
+
+//   // Create the larger message display window
+
+//   // height, width, start row, start col, overflow buffer lines, buffers
+
+// //   display_fields[0] = new_field(display_height, cols, 0, 0, 0, 0);
+
+// //   display_fields[1] = NULL;
+
+
+//   // Create the input field
+
+// //   input_fields[0] = new_field(INPUT_HEIGHT, cols, display_height + 1, 0, 0, 0);
+
+// //   input_fields[1] = NULL;
+
+//     for (int i = 0; i < MAX_LINE_COUNT; i++){
+//         input_fields[i] = new_field(INPUT_HEIGHT, cols, i, 0, 0, 0); //trying to make 40 input fields
+//         field_opts_off(input_fields[i], O_AUTOSKIP & O_WRAP);
+//     }
+//     input_fields[40] = NULL;
+
+//   // Grow the display field buffer as needed
+
+// //   field_opts_off(display_fields[0], O_STATIC);
+
+
+//   // Don't advance to the next field automatically when using the input field
+
+// //   field_opts_off(input_fields[0], O_AUTOSKIP);
+
+
+// //   // Turn off word wrap (nice, but causes other problems)
+
+// //   field_opts_off(input_fields[0], O_WRAP);
+
+// //   field_opts_off(display_fields[0], O_WRAP);
+
+
+//   // Create the forms
+
+// //   display_form = new_form(display_fields);
+
+//   input_form = new_form(input_fields);
+
+
+//   // Display the forms
+
+//   //post_form(display_form);
+
+//   post_form(input_form);
 
 //   refresh();
 
 
-  // Save the callback function
+// //   // Draw a horizontal split
 
-  input_callback = callback;
+// //   for (int i = 0; i < cols; i++) {
 
+// //     mvprintw(display_height, i, "-");
 
-  // Initialize the UI lock
-
-  pthread_mutexattr_init(&ui_lock_attr);
-
-  pthread_mutexattr_settype(&ui_lock_attr, PTHREAD_MUTEX_RECURSIVE);
-
-  pthread_mutex_init(&ui_lock, &ui_lock_attr);
+// //   }
 
 
-  // Running
+// //   // Update the display
 
-  ui_running = true;
-
-}
+// //   refresh();
 
 
-/**
+//   // Save the callback function
 
- * Run the main UI loop. This function will only return the UI is exiting.
-
- */
-
-void ui_run() {
-
-  // Loop as long as the UI is running
-
-  while (ui_running) {
-    // Get a character
-    int ch = getch();
-    // If there was no character, try again
-    if (ch == -1) continue;
-    // There was some character. Lock the UI
-    pthread_mutex_lock(&ui_lock);
-    // Handle input
-    if (ch == KEY_BACKSPACE || ch == KEY_DC || ch == 127) {
-      // Delete the last character when the user presses backspace
-      form_driver(input_form, REQ_DEL_PREV);
-    } else if (ch == KEY_ENTER || ch == '\n') {
-      // When the user presses enter, report new input
-      // Shift to the "next" field (same field) to update the buffer
-      form_driver(input_form, REQ_NEXT_FIELD);
-      // Get a pointer to the start of the input buffer
-      char* buffer = field_buffer(input_fields[0], 0);
-      // Get a pointer to the end of the input buffer
-      char* buffer_end = buffer + strlen(buffer) - 1;
-      // Seek backward until we find a non-space character in the buffer
-      while (buffer_end[-1] == ' ' && buffer_end >= buffer) {
-        buffer_end--;
-      }
-      // Compute the length of the input buffer
-      int buffer_len = buffer_end - buffer;
-      // If there's a message, handle it
-      if (buffer_len > 0) {
-        // Copy the message string out so it can be null-terminated
-        char message[buffer_len + 1];
-        memcpy(message, buffer, buffer_len);
-        message[buffer_len] = '\0';
-        // Run the callback function provided to ui_init
-        input_callback(message);
-        // Clear the input field, but only if the UI didn't exit
-        if (ui_running) form_driver(input_form, REQ_CLR_FIELD);
-      }
+//   input_callback = callback;
 
 
-    } else {
-      // Report normal input characters to the input field
-      form_driver(input_form, ch);
-    }
+//   // Initialize the UI lock
+
+//   pthread_mutexattr_init(&ui_lock_attr);
+
+//   pthread_mutexattr_settype(&ui_lock_attr, PTHREAD_MUTEX_RECURSIVE);
+
+//   pthread_mutex_init(&ui_lock, &ui_lock_attr);
 
 
-    // Unlock the UI
-    pthread_mutex_unlock(&ui_lock);
-  }
+//   // Running
 
-}
+//   ui_running = true;
 
-
-/**
-
- * Add a new message to the user interface's display pane.
-
- *
-
- * \param username  The username that should appear before the message. The UI
-
- *                  code will copy the string out of message, so it is safe to
-
- *                  reuse the memory pointed to by message after this function.
-
- *
-
- * \param message   The string that should be added to the display pane. As with
-
- *                  the username, the UI code will copy the string passed in.
-
- */
-
-void ui_display(const char* username, const char* message) {
-  // Lock the UI
-  pthread_mutex_lock(&ui_lock);
-  // Don't do anything if the UI is not running
-  if (ui_running) {
-    // Add a newline
-    //form_driver(display_form, REQ_NEW_LINE);
-    // Display the username
-    const char* c = username;
-    //while (*c != '\0') {
-      //form_driver(display_form, *c);
-      //c++;
-    //}
-    // form_driver(display_form, ':');
-    // form_driver(display_form, ' ');
-    // Copy the message over to the display field
-    //c = message;
-    while (*c != '\0') {
-      //form_driver(display_form, *c);
-      c++;
-    }
-  } else {
-    printf("%s: %s\n", username, message);
-  }
-  // Unlock the UI
-  pthread_mutex_unlock(&ui_lock);
-}
+// }
 
 
-/**
+// /**
 
- * Stop the user interface and clean up.
+//  * Run the main UI loop. This function will only return the UI is exiting.
 
- */
+//  */
 
-void ui_exit() {
-  // Block access to the UI
-  pthread_mutex_lock(&ui_lock);
+// void ui_run() {
 
-  // The UI is not running
-  ui_running = false;
-  // Clean up
+//   // Loop as long as the UI is running
 
-  //unpost_form(display_form);
-  unpost_form(input_form);
-  //free_form(display_form);
-  free_form(input_form);
-  //free_field(display_fields[0]);
-  for (int i = 0; i < MAX_LINE_COUNT; i++){
-    free_field(input_fields[i]);
-  }
+//   while (ui_running) {
+//     // Get a character
+//     int ch = getch();
+//     // If there was no character, try again
+//     if (ch == -1) continue;
+//     // There was some character. Lock the UI
+//     pthread_mutex_lock(&ui_lock);
+//     // Handle input
+//     if (ch == KEY_BACKSPACE || ch == KEY_DC || ch == 127) {
+//       // Delete the last character when the user presses backspace
+//       form_driver(input_form, REQ_DEL_PREV);
+//     } else if (ch == KEY_ENTER || ch == '\n') {
+//       // When the user presses enter, report new input
+//       // Shift to the "next" field (same field) to update the buffer
+//       form_driver(input_form, REQ_NEXT_FIELD);
+//       // Get a pointer to the start of the input buffer
+//       char* buffer = field_buffer(input_fields[0], 0);
+//       // Get a pointer to the end of the input buffer
+//       char* buffer_end = buffer + strlen(buffer) - 1;
+//       // Seek backward until we find a non-space character in the buffer
+//       while (buffer_end[-1] == ' ' && buffer_end >= buffer) {
+//         buffer_end--;
+//       }
+//       // Compute the length of the input buffer
+//       int buffer_len = buffer_end - buffer;
+//       // If there's a message, handle it
+//       if (buffer_len > 0) {
+//         // Copy the message string out so it can be null-terminated
+//         char message[buffer_len + 1];
+//         memcpy(message, buffer, buffer_len);
+//         message[buffer_len] = '\0';
+//         // Run the callback function provided to ui_init
+//         input_callback(message);
+//         // Clear the input field, but only if the UI didn't exit
+//         if (ui_running) form_driver(input_form, REQ_CLR_FIELD);
+//       }
 
-  endwin();
 
-  // Unlock the UI
-  pthread_mutex_unlock(&ui_lock);
-}
+//     } else {
+//       // Report normal input characters to the input field
+//       form_driver(input_form, ch);
+//     }
+
+
+//     // Unlock the UI
+//     pthread_mutex_unlock(&ui_lock);
+//   }
+
+// }
+
+
+// /**
+
+//  * Add a new message to the user interface's display pane.
+
+//  *
+
+//  * \param username  The username that should appear before the message. The UI
+
+//  *                  code will copy the string out of message, so it is safe to
+
+//  *                  reuse the memory pointed to by message after this function.
+
+//  *
+
+//  * \param message   The string that should be added to the display pane. As with
+
+//  *                  the username, the UI code will copy the string passed in.
+
+//  */
+
+// void ui_display(const char* username, const char* message) {
+//   // Lock the UI
+//   pthread_mutex_lock(&ui_lock);
+//   // Don't do anything if the UI is not running
+//   if (ui_running) {
+//     // Add a newline
+//     //form_driver(display_form, REQ_NEW_LINE);
+//     // Display the username
+//     const char* c = username;
+//     //while (*c != '\0') {
+//       //form_driver(display_form, *c);
+//       //c++;
+//     //}
+//     // form_driver(display_form, ':');
+//     // form_driver(display_form, ' ');
+//     // Copy the message over to the display field
+//     //c = message;
+//     while (*c != '\0') {
+//       //form_driver(display_form, *c);
+//       c++;
+//     }
+//   } else {
+//     printf("%s: %s\n", username, message);
+//   }
+//   // Unlock the UI
+//   pthread_mutex_unlock(&ui_lock);
+// }
+
+
+// /**
+
+//  * Stop the user interface and clean up.
+
+//  */
+
+// void ui_exit() {
+//   // Block access to the UI
+//   pthread_mutex_lock(&ui_lock);
+
+//   // The UI is not running
+//   ui_running = false;
+//   // Clean up
+
+//   //unpost_form(display_form);
+//   unpost_form(input_form);
+//   //free_form(display_form);
+//   free_form(input_form);
+//   //free_field(display_fields[0]);
+//   for (int i = 0; i < MAX_LINE_COUNT; i++){
+//     free_field(input_fields[i]);
+//   }
+
+//   endwin();
+
+//   // Unlock the UI
+//   pthread_mutex_unlock(&ui_lock);
+// }

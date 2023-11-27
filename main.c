@@ -44,34 +44,134 @@ file_rep_t* our_file; //global struct to contain the file representation
 
 locking_file_t* real_file; //global struct to contain the actual file
 
+WINDOW* ui_win;
 
-void draw_form() {//TODO: give this params bc threads will need it//doesn't actually use forms yet
-    initscr();  // Initialize ncurses
-    cbreak();
-    //noecho();
-    int row, col;
-    //getmaxyx(stdscr, row, col);
-    WINDOW *form = newwin(MAX_LINE_COUNT+3, MAX_LINE_LENGTH+3, 1, 1);
-    nodelay(form, true);
-    keypad(form, true);
-    box(form, 0, 0);
-    for (int i = 0; i < MAX_LINE_COUNT; i++) {
-        char line_copy[MAX_LINE_LENGTH];
-        memcpy(line_copy,our_file->contents[i].line_contents, MAX_LINE_LENGTH);
-        line_copy[MAX_LINE_LENGTH-1]='\0'; //replace the newline with null terminator
-        mvwprintw(form, i + 1, 1, "%s", line_copy);
+char* int_to_string(int i){
+    char* return_val = malloc((sizeof(char)*2));
+    int tens_place = i / 10;
+    int ones_place = i % 10;
+    if (tens_place != 0){
+        char tens = ((char)tens_place) + '0';
+        return_val[0]=tens;
+        char ones = ((char)ones_place)+'0';
+        return_val[1]=ones;
     }
-    wrefresh(form);
-    post_form(form);
-
-   int ch;
-    do {//if you copy this part out the form shows up
-        ch = getch();
-        //wrefresh(form);
-    } while (ch != 'q');//this works but WHERE TF IS THE FORM
-
-    endwin();
+    else{//i is less than 10
+        char val = ((char)i + '0');
+        return_val[0]= val;
+        return_val[1]= ' ';
+    }
+    return return_val;
 }
+
+
+void write_contents(){
+    int row = 0;
+    int col = 0;
+    for (; col < MAX_LINE_LENGTH; col++){
+        mvaddch(row, col, ' ');
+    }
+    row++;
+    col = 0;
+    for (; row <= MAX_LINE_COUNT; row++){
+        char* line_num = malloc((sizeof(char))*2);
+        memcpy(line_num, int_to_string(row), 2);
+        mvaddch(row, 0, line_num[0]);
+        mvaddch(row, 1, line_num[1]);
+        mvaddch(row, 2, ' ');
+        // if (row < 10){
+        //     mvaddch(row, 0, (row-'0'));
+        // }
+        // else{
+        //     mvaddch(row, 0, 'X');
+        // }
+        for (col = 3; col <= MAX_LINE_LENGTH+ 2; col++){
+        mvaddch(row, col, our_file->contents[row-1].line_contents[col-3]);
+        }
+        refresh();
+    }
+    move(0,0);
+    refresh();
+}
+
+void overwrite_line(){
+    char c = getch();
+    int i = 0;
+    char line_num_rep[3];//make a char array of 2 slots for storing the line number
+    line_num_rep[2]='\0';
+    while (c != '\n'){
+        if (i < 2){
+        line_num_rep[i]= c;
+        }
+        i++;
+        c = getch();
+    }
+    if (i == 0){
+        //some error message saying to put a line number
+        return;
+    }
+    if (i == 1){//only one digit long
+        line_num_rep[i]='\0';//end the string early
+    }
+    int line_num = atoi(line_num_rep)-1;//transform the line number rep to the index of the array
+    //TODO: set the owner field of the line here
+    char overwriting = getch();
+    i = 0; //reset the index overwriter
+    while (overwriting != '\n'){
+        if (i < MAX_LINE_LENGTH-1){
+            our_file->contents[line_num].line_contents[i]=overwriting;
+        }
+        i++;
+        overwriting = getch();
+    }
+    while (i < MAX_LINE_LENGTH-1){
+        our_file->contents[line_num].line_contents[i]=' '; //pad with spaces again
+    }
+    fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_SET);//go to the right line in the file
+    fwrite(our_file->contents[line_num].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed
+    fseek(real_file->file_ref, 0, SEEK_SET);//put the cursor back at the top of the file
+    int to_row = line_num+1; //+1 to undo the subtraction from indexing
+    for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
+        mvaddch(to_row, col, our_file->contents[line_num].line_contents[col-3]);
+    }
+    refresh();
+    move(0,0);//put the cursor back at the top
+    refresh();
+}
+
+// void draw_form() {//TODO: give this params bc threads will need it//doesn't actually use forms yet
+//     initscr();  // Initialize ncurses
+//     cbreak();
+//     //noecho();
+//     int row, col;
+//     //getmaxyx(stdscr, row, col);
+//     WINDOW *form = newwin(MAX_LINE_COUNT+3, MAX_LINE_LENGTH+3, 1, 1);
+//     nodelay(form, true);
+//     keypad(form, true);
+//     box(form, 0, 0);
+//     for (int i = 0; i < MAX_LINE_COUNT; i++) {
+//         char line_copy[MAX_LINE_LENGTH];
+//         memcpy(line_copy,our_file->contents[i].line_contents, MAX_LINE_LENGTH);
+//         line_copy[MAX_LINE_LENGTH-1]='\0'; //replace the newline with null terminator
+//         mvwprintw(form, i + 1, 1, "%s", line_copy);
+//     }
+//     wrefresh(form);
+//     //post_form(form);
+
+//     ui_run();
+   
+//    while (true){
+//     int ch;
+//     //wrefresh(form);
+//     do {//if you copy this part out the form shows up
+//         ch = getch();
+//         wrefresh(form);
+//     } while (ch != 'q');//this works but WHERE TF IS THE FORM
+//     break;
+//    }
+//     endwin();
+    
+// }
 
 
 /**
@@ -170,6 +270,11 @@ int main(int argc, char **argv){
     if (argc == 4){//connecting to editing session
         //TODO: set up connection
     }
-    draw_form();
+    ui_init(ui_win);
+    write_contents();
+    //draw_form();
+    while(true){
+        overwrite_line();
+    }
     return 0;
 } 

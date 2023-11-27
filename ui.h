@@ -1,5 +1,5 @@
 #if !defined(UI_H)
-
+#include <curses.h>
 #define UI_H
 
 
@@ -30,7 +30,11 @@ typedef void (*input_callback_t)(const char*);
  *                  The string passed to the callback should be copied if you
  *                  need to retain it after the callback function returns.
  */
-void ui_init(input_callback_t callback);
+// void ui_init(input_callback_t callback);
+void ui_init(WINDOW* win);
+
+// void display_init(WINDOW* win, file_rep_t* content);
+
 
 
 /**
