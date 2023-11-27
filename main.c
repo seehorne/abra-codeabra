@@ -97,13 +97,14 @@ void write_contents(){
 }
 
 void overwrite_line(){
+    char line_num_rep[3];//make a char array of 2 slots for storing the line number
+    line_num_rep[2]='\0';
     FILE* log = fopen("log.txt", "w+");
     fprintf(log, "we can write\n");
     fflush(log);
+    while (strcmp(line_num_rep, ":q")!=0){//run until quit
     char c = getch();
     int i = 0;
-    char line_num_rep[3];//make a char array of 2 slots for storing the line number
-    line_num_rep[2]='\0';
     while (c != '\n'){
         if (c != ERR){
         if (i < 2){
@@ -119,6 +120,10 @@ void overwrite_line(){
     }
     if (i == 1){//only one digit long
         line_num_rep[i]='\0';//end the string early
+    }
+    fprintf(log, "line ''number'': %s\n", line_num_rep);
+    if (strcmp(line_num_rep, ":q")==0){
+        break;
     }
     int line_num = atoi((const char*)line_num_rep)-1;//transform the line number rep to the index of the array
     //TODO: set the owner field of the line here
@@ -169,6 +174,7 @@ void overwrite_line(){
     wrefresh(ui_win);
     move(0,0);//put the cursor back at the top
     wrefresh(ui_win);
+    }
     fclose(log);
 }
 
@@ -310,9 +316,7 @@ int main(int argc, char **argv){
     mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do  
     write_contents();
     //draw_form();
-    while(true){
-        overwrite_line();
-    }
+    overwrite_line();
     fclose(real_file->file_ref);
     endwin();
     return 0;
