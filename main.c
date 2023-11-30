@@ -10,12 +10,33 @@
 #include <string.h>
 #include <form.h>
 #include "ui.h"
+#include "socket.h"
+#include "message.h"
 
 #define MAX_LINE_LENGTH 101 //100 chars plus a newline
 #define MAX_LINE_COUNT 40
 
 const char* username;
 const char* filename;
+FILE* log_f;
+
+/**
+ * struct for 1 node in a linked list
+ * */
+typedef struct list_node {
+  int data;            //<the entry (a file descriptor, represents a socket)
+  struct list_node* next;  //<the next node in the list
+} list_node_t; 
+
+/**
+ * struct for a linked_list
+ * */
+typedef struct list {
+  list_node_t* head;          //<head of the linked list
+} list_t;
+
+//make the list of connections global so all threads can get to it
+list_t* users = NULL;
 
 //filestream with a lock around it (so we can easily update lines)
 typedef struct locking_file{
@@ -36,8 +57,8 @@ typedef struct file_rep {
 
 //file (the stream, actual writing thing) and file data structure bundled for threads to have copies
 typedef struct thread_file_package{
-    locking_file_t* document; //<writable stream
     file_rep_t* representation; //<data structure with file contents
+    uint8_t port_num;
 } thread_file_package_t;
 
 file_rep_t* our_file; //global struct to contain the file representation
@@ -96,12 +117,10 @@ void write_contents(){
     refresh();
 }
 
-void overwrite_line(){
+int overwrite_line(){
     char line_num_rep[3];//make a char array of 2 slots for storing the line number
     line_num_rep[2]='\0';
-    FILE* log = fopen("log.txt", "w+");
-    fprintf(log, "we can write\n");
-    fflush(log);
+    
     while (strcmp(line_num_rep, ":q")!=0){//run until quit
     char c = getch();
     int i = 0;
@@ -115,36 +134,42 @@ void overwrite_line(){
         c = getch();
     }
     if (i == 0){
-        //some error message saying to put a line number
-        return;
+        return -1;//code for no input for line num
     }
     if (i == 1){//only one digit long
         line_num_rep[i]='\0';//end the string early
     }
-    fprintf(log, "line ''number'': %s\n", line_num_rep);
+    fprintf(log_f, "line ''number'': %s\n", line_num_rep);
     if (strcmp(line_num_rep, ":q")==0){
         break;
     }
-    int line_num = atoi((const char*)line_num_rep)-1;//transform the line number rep to the index of the array
+    int line_num = atoi((const char*)line_num_rep);//transform the line number rep to the index of the array
+    if (line_num > MAX_LINE_COUNT){
+        return -2;
+    }
+    if (line_num == 0){
+        return -3; //atoi error
+    }
+    line_num--; //subtract 1
     //TODO: set the owner field of the line here
-    fprintf(log, "line we read: %d)\n", line_num);
-    fflush(log);
+    fprintf(log_f, "line we read: %d)\n", line_num);
+    fflush(log_f);
     //char overwrite_buf[MAX_LINE_LENGTH-1];
     char overwriting = getch();//works fine
     i = 0; //reset the index overwriter
     while (overwriting != '\n'){
         if (overwriting != ERR){
-            fprintf(log, "char we allegedly read: %c\n", overwriting);
-            fflush(log);
+            fprintf(log_f, "char we allegedly read: %c\n", overwriting);
+            fflush(log_f);
         if (i < MAX_LINE_LENGTH-1){
             our_file->contents[line_num].line_contents[i]=overwriting;//we did not save somehow. fuck.
             // overwrite_buf[i]=overwriting;
-            // fprintf(log, "new buffer content new: %c\n", overwriting);
-            // fflush(log);
+            // fprintf(log_f, "new buffer content new: %c\n", overwriting);
+            // fflush(log_f);
         }
         i++;
-        fprintf(log, "reading char: %c\n", our_file->contents[line_num].line_contents[i]);//fprintf for log file
-        fflush(log);
+        fprintf(log_f, "reading char: %c\n", our_file->contents[line_num].line_contents[i]);//fprintf for log_f file
+        fflush(log_f);
         }
         overwriting = getch();// works fine
     }
@@ -153,8 +178,8 @@ void overwrite_line(){
         i++;
     }
     our_file->contents[line_num].line_contents[MAX_LINE_LENGTH-1]='\0';
-    fprintf(log, "read line: %s\n", our_file->contents[line_num].line_contents);
-    fflush(log);
+    fprintf(log_f, "read line: %s\n", our_file->contents[line_num].line_contents);
+    fflush(log_f);
     our_file->contents[line_num].line_contents[MAX_LINE_LENGTH-1]='\n';
     fseek(real_file->file_ref, 0, SEEK_SET);
     fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
@@ -175,7 +200,7 @@ void overwrite_line(){
     move(0,0);//put the cursor back at the top
     wrefresh(ui_win);
     }
-    fclose(log);
+    return 0;
 }
 
 // void draw_form() {//TODO: give this params bc threads will need it//doesn't actually use forms yet
@@ -230,84 +255,166 @@ void input_callback(const char* message) {
     ui_display(username, message);
   }
 }
+/**
+ * adds the new node of peer data to the front of users
+ * \param value the data to be added to the list
+ **/
+void list_add(int value) {
+  list_node_t* to_insert = malloc(sizeof(list_node_t));  // make space for the node
+  to_insert->data = value;
+  if (users == NULL){//list not initialized, needs to be
+    users = malloc(sizeof(list_t));//malloc space for the list
+    users->head = to_insert;//make the node we just created the head of the list
+    users->head->next = NULL;//set the next to NULL
+  }
+  else{
+  list_node_t* current = users->head;           // save the current head
+  users->head = to_insert;                  // set what used to be head to next
+  users->head->next= current;                      // set the new thing to head
+  }
+}
 
+/**
+* add_user
+* connects a client to you, and adds them to your list of connections 
+* \param arg argument to function, int* wrapped in void*
+* \returns NULL if it ever manages to leave, which it should not be able to do
+**/
+void* add_user(void* arg){ //get socket out of arg
+  int* socket = (int*)arg;
+  //running indefinitely looking for new connections
+  while (true){
+  // Waiting thread for a new thread to join
+    int* client_socket_fd = malloc(sizeof(int));
+    *client_socket_fd = server_socket_accept(*socket);
+    if (*client_socket_fd == -1) {
+      perror("accept failed");
+      exit(EXIT_FAILURE);
+    }
+    send_message(*client_socket_fd, )
+    //add to the list
+    //lock while we accept the connection and add a client 
+    // pthread_mutex_lock(&lock);
+    list_add(*client_socket_fd); 
+    // pthread_mutex_unlock(&lock);
+    // pthread_t disseminate_thread; //launches a thread to disseminate to this connection
+    // pthread_create(&disseminate_thread, NULL, recieve_and_distribute, client_socket_fd);
+  }
+  return NULL; //bc it must return a void*
+}
 
 int main(int argc, char **argv){
     //ui_init(input_callback);
+    //Set up the log_f file
+    log_f = fopen("log.txt", "w+");
+    fflush(log_f);
+
     bool pre_existing = true;
     our_file = malloc(sizeof(file_rep_t));
     real_file = malloc(sizeof(locking_file_t));
     pthread_mutex_init(&real_file->file_lock, NULL);
+    
+    //Set up a server socket to accept incoming connections
+    unsigned short port = 0;
+    int server_socket_fd = server_socket_open(&port);
+    if (server_socket_fd == -1) {
+        perror("Server socket was not opened");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_socket_fd, 1)) {
+        perror("listen failed"); 
+        exit(EXIT_FAILURE);
+    }
+ 
 
     if(argc != 3 && argc !=4){
         fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>]\n", argv[0], argv[0]);
     }
     if (argc == 3){ //setup for session host. run program, username, and filename
+    
         username = argv[1];
         filename = argv[2];
-    // TODO:  ncurses 
-    //O_CREAT | O_RDWR| O_EXCL
-    //read the specified file into the data structure
-    chmod(filename, 00777);//set rwx to good for everyone (if it exists, this doesn't do anything otherwise)
-    real_file->file_ref = fopen(filename, "r+");//tries to open the file (does not overwrite)
-    if (real_file->file_ref ==NULL){//the file does not exist
-        pre_existing = false;
-        real_file->file_ref = fopen(filename, "w+"); //create the file if it doesn't exist which it doesn't
-    }
-    //printf("did not crash trying to r+x open the file\n");
-    //when we launch threads, we probably want the void* to include the global file_rep as well
-    char put_this;
-    for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
-        put_this=fgetc(real_file->file_ref);//read the first char of the file, for a starting off place
-        for (int chars = 0; chars < (MAX_LINE_LENGTH-1); chars++){//if we didn't just break, start reading characters into lines
-            if (put_this != EOF && put_this != '\n'){//if it's the newline or EOF, stop reading into this line
-                our_file->contents[file_lines].line_contents[chars]= put_this;
-                put_this = fgetc(real_file->file_ref);//read for next time
+        // send the port 
+        char info_message[200];
+        fprintf(log_f, "CONNECT TO %s WITH THIS PORT -> %d\n", username, port);
+        fflush(log_f);
+        // TODO:  ncurses 
+        // O_CREAT | O_RDWR| O_EXCL
+        // read the specified file into the data structure
+        chmod(filename, 00777);//set rwx to good for everyone (if it exists, this doesn't do anything otherwise)
+        real_file->file_ref = fopen(filename, "r+");//tries to open the file (does not overwrite)
+        if (real_file->file_ref ==NULL){//the file does not exist
+            pre_existing = false;
+            real_file->file_ref = fopen(filename, "w+"); //create the file if it doesn't exist which it doesn't
+        }
+        //printf("did not crash trying to r+x open the file\n");
+        //when we launch threads, we probably want the void* to include the global file_rep as well
+        char put_this;
+        for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
+            put_this=fgetc(real_file->file_ref);//read the first char of the file, for a starting off place
+            for (int chars = 0; chars < (MAX_LINE_LENGTH-1); chars++){//if we didn't just break, start reading characters into lines
+                if (put_this != EOF && put_this != '\n'){//if it's the newline or EOF, stop reading into this line
+                    our_file->contents[file_lines].line_contents[chars]= put_this;
+                    put_this = fgetc(real_file->file_ref);//read for next time
+                }
+                else{
+                    if (chars < (MAX_LINE_LENGTH-1)){//not the very last char in array
+                        our_file->contents[file_lines].line_contents[chars]= ' '; //fill up to end of line with spaces, for navigational ease (pointer math of line lengths)
+                    }
+                    else{//very last char in line should be the null terminator
+                        our_file->contents[file_lines].line_contents[chars]= '\n';
+                    }
+                }
+            }
+            //if the 100 characters was not enough, oops, sorry your line gets cut off, should have read the rules
+            while (put_this != '\n' && put_this != EOF){//enters this loop if 100 characters was not enough
+                put_this = fgetc(real_file->file_ref); //don't store it, just walk through it
+            }
+            our_file->contents[file_lines].line_contents[MAX_LINE_LENGTH-1]= '\n';
+        }
+        if (pre_existing){
+            freopen(filename, "w+", real_file->file_ref);//overwrite it so we can write our data structure to it
+        }
+        for (int num_lines = 0; num_lines < MAX_LINE_COUNT; num_lines++){
+            if (num_lines == MAX_LINE_COUNT-1){
+                fwrite(our_file->contents[num_lines].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything but the newline for the last line
             }
             else{
-                if (chars < (MAX_LINE_LENGTH-1)){//not the very last char in array
-                    our_file->contents[file_lines].line_contents[chars]= ' '; //fill up to end of line with spaces, for navigational ease (pointer math of line lengths)
-                }
-                else{//very last char in line should be the null terminator
-                    our_file->contents[file_lines].line_contents[chars]= '\n';
-                }
+                fwrite(our_file->contents[num_lines].line_contents, 1, MAX_LINE_LENGTH, real_file->file_ref); //write the whole line, including newline
             }
         }
-        //if the 100 characters was not enough, oops, sorry your line gets cut off, should have read the rules
-        while (put_this != '\n' && put_this != EOF){//enters this loop if 100 characters was not enough
-            put_this = fgetc(real_file->file_ref); //don't store it, just walk through it
+        fseek(real_file->file_ref, 0, SEEK_SET); //puts the pointer back at the start of the file
+        // WINDOW* mainwin = initscr();
+        // fclose(real_file->file_ref);
+        // if (mainwin == NULL) {
+        //     fprintf(stderr, "Error initializing ncurses.\n");
+        //     exit(2);
+        // }
+        // printw("Hello world!");
+        // refresh();
+        // for (int i = 0; i < MAX_LINE_COUNT; i++){
+        //     printw("|\n");
+        //     refresh();
+        // }
+        // sleep(1000);
+        // endwin();
+        pthread_t listen_thread;
+        if(pthread_create(&listen_thread, NULL, add_user, &server_socket_fd)){
+            perror("pthread failed"); 
+            exit(EXIT_FAILURE);
         }
-        our_file->contents[file_lines].line_contents[MAX_LINE_LENGTH-1]= '\n';
-    }
-    if (pre_existing){
-        freopen(filename, "w+", real_file->file_ref);//overwrite it so we can write our data structure to it
-    }
-    for (int num_lines = 0; num_lines < MAX_LINE_COUNT; num_lines++){
-        if (num_lines == MAX_LINE_COUNT-1){
-            fwrite(our_file->contents[num_lines].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything but the newline for the last line
-        }
-        else{
-            fwrite(our_file->contents[num_lines].line_contents, 1, MAX_LINE_LENGTH, real_file->file_ref); //write the whole line, including newline
-        }
-    }
-    fseek(real_file->file_ref, 0, SEEK_SET); //puts the pointer back at the start of the file
-    // WINDOW* mainwin = initscr();
-    // fclose(real_file->file_ref);
-    // if (mainwin == NULL) {
-    //     fprintf(stderr, "Error initializing ncurses.\n");
-    //     exit(2);
-    // }
-    // printw("Hello world!");
-    // refresh();
-    // for (int i = 0; i < MAX_LINE_COUNT; i++){
-    //     printw("|\n");
-    //     refresh();
-    // }
-    // sleep(1000);
-    // endwin();
     }
     if (argc == 4){//connecting to editing session
         //TODO: set up connection
+        // Unpack arguments
+        char* peer_hostname = argv[2];
+        unsigned short peer_port = atoi(argv[3]);
+        int socket_fd = socket_connect(peer_hostname, peer_port);
+        if (socket_fd == -1) {
+            perror("Failed to connect");
+            exit(EXIT_FAILURE);
+        }
+
     }
     //ui_init(ui_win);
     ui_win = initscr();
@@ -316,8 +423,12 @@ int main(int argc, char **argv){
     mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do  
     write_contents();
     //draw_form();
-    overwrite_line();
+    int close_time = overwrite_line();
+    while (close_time != 0){
+        close_time = overwrite_line(); //run until we exit normally
+    }
     fclose(real_file->file_ref);
+    fclose(log_f);
     endwin();
     return 0;
 } 
