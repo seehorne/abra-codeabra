@@ -15,10 +15,15 @@
 
 #define MAX_LINE_LENGTH 101 //100 chars plus a newline
 #define MAX_LINE_COUNT 40
+#define HOST_RUN 3
+#define CLIENT_RUN 4
+
 
 const char* username;
 const char* filename;
+const int my_host;
 FILE* log_f;
+FILE* log_f2;
 
 /**
  * struct for 1 node in a linked list
@@ -61,6 +66,11 @@ typedef struct thread_file_package{
     uint8_t port_num;
 } thread_file_package_t;
 
+typedef struct info_passing{
+  int port;
+  int argc;
+} info_passing_t;
+
 file_rep_t* our_file; //global struct to contain the file representation
 
 locking_file_t* real_file; //global struct to contain the actual file
@@ -69,7 +79,7 @@ WINDOW* ui_win;
 
 //int string_to
 
-char* int_to_string(int i){
+char* int_to_string(int i){//works for client and server
     char* return_val = malloc((sizeof(char)*2));
     int tens_place = i / 10;
     int ones_place = i % 10;
@@ -88,7 +98,7 @@ char* int_to_string(int i){
 }
 
 
-void write_contents(){
+void write_contents(){//works for client and server
     int row = 0;
     int col = 0;
     for (; col < MAX_LINE_LENGTH; col++){
@@ -111,13 +121,14 @@ void write_contents(){
         for (col = 3; col <= MAX_LINE_LENGTH+ 2; col++){
         mvaddch(row, col, our_file->contents[row-1].line_contents[col-3]);
         }
-        refresh();
+        //refresh();
+        wrefresh(ui_win);
     }
     move(0,0);
     refresh();
 }
 
-int overwrite_line(){
+int overwrite_line(int argc){//works for server only
     char line_num_rep[3];//make a char array of 2 slots for storing the line number
     line_num_rep[2]='\0';
     
@@ -183,6 +194,7 @@ int overwrite_line(){
     fprintf(log_f, "read line: %s\n", our_file->contents[line_num].line_contents);
     fflush(log_f);
     our_file->contents[line_num].line_contents[MAX_LINE_LENGTH-1]='\n';
+    if (argc == HOST_RUN){
     fseek(real_file->file_ref, 0, SEEK_SET);
     fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
     // real_file->file_ref += (line_num * MAX_LINE_LENGTH);
@@ -193,6 +205,7 @@ int overwrite_line(){
     // }
     //real_file->file_ref -= (line_num * MAX_LINE_LENGTH)+99;//put us back
     fseek(real_file->file_ref, 0, SEEK_SET);//put the cursor back at the top of the file
+    }//if we're the host, write to the actual file
     int to_row = line_num+1; //+1 to undo the subtraction from indexing
     for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
         mvaddch(to_row, col, our_file->contents[line_num].line_contents[col-3]);
@@ -282,16 +295,49 @@ void list_add(int value) {
 * Then the host will send the change to the rest of the clients. 
 */
 void* recieve_and_distribute(void* arg){
-  int* client_socket_fd = (int*) arg;
+  bool newly_launched = true;
+  info_passing_t* unpacked = (info_passing_t*)arg;
+  int client_socket_fd = unpacked->port;
+  int argc = unpacked->argc;
   //this while loop loops until this the client program does not exist
   while(true){
-    char* line_num = receive_message(*client_socket_fd);
-    char* message = receive_message(*client_socket_fd);
+    if (argc==HOST_RUN && newly_launched==true){
+      int rc;
+      for (int i = 0; i< MAX_LINE_LENGTH; i++){
+        rc = send_message(client_socket_fd, our_file->contents[i].line_contents);
+      }
+      if (rc==-1){
+        fprintf(log_f, "I'm a host: didn't send the message ):\n");
+        fflush(log_f);
+      }
+      newly_launched=false;
+    }
+    if (argc==CLIENT_RUN && newly_launched==true){
+      fprintf(log_f2, "made it into client\n");
+      fflush(log_f2);
+      for (int j = 0; j<MAX_LINE_LENGTH; j++){
+        char* message = receive_message(client_socket_fd);
+        if (message == NULL){//did not recieve message
+          fprintf(log_f2, "I'm a client: didn't read/recieve the message ):\n");
+          fflush(log_f2);
+        }
+        else{
+        memcpy(our_file->contents[j].line_contents,message,MAX_LINE_LENGTH);//copy the message into the local copy of the data structure
+        fprintf(log_f2,"trying to write in: %s\n",our_file->contents[j].line_contents);
+        fflush(log_f2);
+        }
+      }
+      newly_launched=false;
+      write_contents();
+    }
+    char* line_num = receive_message(client_socket_fd);
+    char* message = receive_message(client_socket_fd);
     if (line_num == NULL || message == NULL) { 
       //if the message received is null or the client is no longer connected, delete the client holding this client_socket_fd 
       //pthread_mutex_lock(&lock);
+      if (users != NULL){
       list_node_t* temp = users->head; 
-      if(temp->data == *client_socket_fd){// if the client to be removed is the top client
+      if(temp->data == client_socket_fd){// if the client to be removed is the top client
           users->head = temp->next;
           free(temp);
       }else{ // if the client isn't the first in the linked list find it and remove it
@@ -299,7 +345,7 @@ void* recieve_and_distribute(void* arg){
         temp = temp->next;
         //loop through the link list to find the client that has this client socket fd
         while(temp!= NULL){
-          if(temp->data == *client_socket_fd){
+          if(temp->data == client_socket_fd){
             prev->next = temp->next;
             free(temp);
             break;
@@ -308,6 +354,7 @@ void* recieve_and_distribute(void* arg){
           temp = temp->next;
         }
       }
+      }
       //pthread_mutex_unlock(&lock);
       return NULL;
     }else{
@@ -315,7 +362,7 @@ void* recieve_and_distribute(void* arg){
       list_node_t* temp = users->head; 
       while(temp!= NULL){
         //check to send line number and message to other connected clients
-        if(temp->data != *client_socket_fd){
+        if(temp->data != client_socket_fd){
           int rc = send_message(temp->data, line_num);
           if (rc == -1) {
             perror("Failed to send line number to client");
@@ -349,7 +396,10 @@ void* recieve_and_distribute(void* arg){
 * \returns NULL if it ever manages to leave, which it should not be able to do
 **/
 void* add_user(void* arg){ //get socket out of arg
-  int* socket = (int*)arg;
+  info_passing_t* unpacked = (info_passing_t*)arg;
+  int argc = unpacked->argc;
+  int socket_val = unpacked->port;
+  int* socket = &socket_val;
   //running indefinitely looking for new connections
   while (true){
   // Waiting thread for a new thread to join
@@ -363,18 +413,25 @@ void* add_user(void* arg){ //get socket out of arg
     //lock while we accept the connection and add a client 
     // pthread_mutex_lock(&lock);
     list_add(*client_socket_fd); 
+    info_passing_t pass;
+    pass.port = *client_socket_fd;
+    pass.argc = argc;
     // pthread_mutex_unlock(&lock);
     pthread_t disseminate_thread; //launches a thread to recieve from this connection and disseminate to other clients
-    pthread_create(&disseminate_thread, NULL, recieve_and_distribute, client_socket_fd);
+    pthread_create(&disseminate_thread, NULL, recieve_and_distribute, &pass);
   }
   return NULL; //bc it must return a void*
 }
 
 int main(int argc, char **argv){
+    ui_win = initscr();
+    keypad(ui_win, true);   // Support arrow keys
     //ui_init(input_callback);
     //Set up the log_f file
     log_f = fopen("log.txt", "w+");
     fflush(log_f);
+    log_f2 = fopen("log2.txt", "w+");
+    fflush(log_f2);
 
     bool pre_existing = true;
     our_file = malloc(sizeof(file_rep_t));
@@ -386,6 +443,7 @@ int main(int argc, char **argv){
     int server_socket_fd = server_socket_open(&port);
     if (server_socket_fd == -1) {
         perror("Server socket was not opened");
+        fprintf(log_f, "server socket couldn't open\n");
         exit(EXIT_FAILURE);
     }
     if (listen(server_socket_fd, 1)) {
@@ -394,10 +452,10 @@ int main(int argc, char **argv){
     }
  
 
-    if(argc != 3 && argc !=4){
+    if(argc != HOST_RUN && argc !=CLIENT_RUN){
         fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>]\n", argv[0], argv[0]);
     }
-    if (argc == 3){ //setup for session host. run program, username, and filename
+    if (argc == HOST_RUN){ //setup for session host. run program, username, and filename
     
         username = argv[1];
         filename = argv[2];
@@ -465,38 +523,49 @@ int main(int argc, char **argv){
         // }
         // sleep(1000);
         // endwin();
+        info_passing_t arg;
+        arg.port = server_socket_fd;
+        arg.argc= argc;
         pthread_t listen_thread;
-        if(pthread_create(&listen_thread, NULL, add_user, &server_socket_fd)){
+        if(pthread_create(&listen_thread, NULL, add_user, &arg)){//inside of host, listen for new clients
             perror("pthread failed"); 
             exit(EXIT_FAILURE);
         }
     }
-    if (argc == 4){//connecting to editing session
+    if (argc == CLIENT_RUN){//connecting to editing session
         //TODO: set up connection
         // Unpack arguments
         char* peer_hostname = argv[2];
         unsigned short peer_port = atoi(argv[3]);
-        int socket_fd = socket_connect(peer_hostname, peer_port);
-        if (socket_fd == -1) {
+        int my_host = socket_connect(peer_hostname, peer_port);
+        if (my_host == -1) {
             perror("Failed to connect");
             exit(EXIT_FAILURE);
         }
-
+        info_passing_t arg;
+        arg.port = my_host;
+        arg.argc= argc;
+        pthread_t disseminate_thread;
+        if (pthread_create(&disseminate_thread, NULL, recieve_and_distribute,  &arg)) {
+            perror("pthread_create failed");
+            exit(EXIT_FAILURE);
+        }
     }
     //ui_init(ui_win);
-    ui_win = initscr();
-    keypad(ui_win, true);   // Support arrow keys
     //nodelay(ui_win, true);  // Non-blocking keyboard access
-    mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do  
+    //mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do  
     write_contents();
     //draw_form();
-    int close_time = overwrite_line();
+    int close_time = overwrite_line(argc);
     while (close_time != 0){
         clrtoeol(); // clears what was typed on input line after input is entered
-        close_time = overwrite_line(); //run until we exit normally
+        close_time = overwrite_line(argc); //run until we exit normally
     }
+    if (argc==HOST_RUN){
     fclose(real_file->file_ref);
+    }
     fclose(log_f);
+    fclose(log_f2);
     endwin();
     return 0;
 } 
