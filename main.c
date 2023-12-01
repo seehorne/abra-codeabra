@@ -155,6 +155,7 @@ int overwrite_line(){
     fprintf(log_f, "line we read: %d)\n", line_num);
     fflush(log_f);
     //char overwrite_buf[MAX_LINE_LENGTH-1];
+    clrtoeol(); // clears what was typed on input line after input is entered
     char overwriting = getch();//works fine
     i = 0; //reset the index overwriter
     while (overwriting != '\n'){
@@ -173,6 +174,7 @@ int overwrite_line(){
         }
         overwriting = getch();// works fine
     }
+    clrtoeol(); // clears what was typed on input line after input is entered  
     while (i < MAX_LINE_LENGTH-1){
         our_file->contents[line_num].line_contents[i]=' '; //pad with spaces again
         i++;
@@ -268,12 +270,78 @@ void list_add(int value) {
     users->head->next = NULL;//set the next to NULL
   }
   else{
-  list_node_t* current = users->head;           // save the current head
-  users->head = to_insert;                  // set what used to be head to next
-  users->head->next= current;                      // set the new thing to head
+    list_node_t* current = users->head;           // save the current head
+    users->head = to_insert;                  // set what used to be head to next
+    users->head->next= current;                      // set the new thing to head
   }
 }
 
+/**
+* This thread function continues running for each client that connects to continously
+* receive messages in the backgroud and prints them to the host's screen and the file.
+* Then the host will send the change to the rest of the clients. 
+*/
+void* recieve_and_distribute(void* arg){
+  int* client_socket_fd = (int*) arg;
+  //this while loop loops until this the client program does not exist
+  while(true){
+    char* line_num = receive_message(*client_socket_fd);
+    char* message = receive_message(*client_socket_fd);
+    if (line_num == NULL || message == NULL) { 
+      //if the message received is null or the client is no longer connected, delete the client holding this client_socket_fd 
+      //pthread_mutex_lock(&lock);
+      list_node_t* temp = users->head; 
+      if(temp->data == *client_socket_fd){// if the client to be removed is the top client
+          users->head = temp->next;
+          free(temp);
+      }else{ // if the client isn't the first in the linked list find it and remove it
+        list_node_t* prev = temp;
+        temp = temp->next;
+        //loop through the link list to find the client that has this client socket fd
+        while(temp!= NULL){
+          if(temp->data == *client_socket_fd){
+            prev->next = temp->next;
+            free(temp);
+            break;
+          }
+          prev = temp;
+          temp = temp->next;
+        }
+      }
+      //pthread_mutex_unlock(&lock);
+      return NULL;
+    }else{
+      //pthread_mutex_lock(&lock);
+      list_node_t* temp = users->head; 
+      while(temp!= NULL){
+        //check to send line number and message to other connected clients
+        if(temp->data != *client_socket_fd){
+          int rc = send_message(temp->data, line_num);
+          if (rc == -1) {
+            perror("Failed to send line number to client");
+            //pthread_mutex_unlock(&lock);
+            exit(EXIT_FAILURE);
+          }
+          rc = send_message(temp->data, message);
+          if (rc == -1) {
+            perror("Failed to send message to client");
+            //pthread_mutex_unlock(&lock);
+            exit(EXIT_FAILURE);
+          }
+        }
+        temp = temp->next;
+      }
+      //pthread_mutex_unlock(&lock);
+      //ui_display(username, message); 
+
+      // This is a thread made by host recieving messages from clients
+      // therefore we need to:
+      // write to the host's screen.
+      // write to file
+    }
+  }  
+  return NULL;
+}
 /**
 * add_user
 * connects a client to you, and adds them to your list of connections 
@@ -291,14 +359,13 @@ void* add_user(void* arg){ //get socket out of arg
       perror("accept failed");
       exit(EXIT_FAILURE);
     }
-    send_message(*client_socket_fd, )
     //add to the list
     //lock while we accept the connection and add a client 
     // pthread_mutex_lock(&lock);
     list_add(*client_socket_fd); 
     // pthread_mutex_unlock(&lock);
-    // pthread_t disseminate_thread; //launches a thread to disseminate to this connection
-    // pthread_create(&disseminate_thread, NULL, recieve_and_distribute, client_socket_fd);
+    pthread_t disseminate_thread; //launches a thread to recieve from this connection and disseminate to other clients
+    pthread_create(&disseminate_thread, NULL, recieve_and_distribute, client_socket_fd);
   }
   return NULL; //bc it must return a void*
 }
@@ -425,6 +492,7 @@ int main(int argc, char **argv){
     //draw_form();
     int close_time = overwrite_line();
     while (close_time != 0){
+        clrtoeol(); // clears what was typed on input line after input is entered
         close_time = overwrite_line(); //run until we exit normally
     }
     fclose(real_file->file_ref);
