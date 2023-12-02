@@ -1,4 +1,4 @@
-# collaborative-code-editor
+# abra codeabra
 Grinnell College CSC-213 Fall '23 Final Project
 ## description
 This project is a collaborative code editor that can be run on Mathlan.
