@@ -53,7 +53,7 @@ typedef struct locking_file{
 //structure for a file line, contents char[], int to represent who owns it
 typedef struct file_line {
     char line_contents[MAX_LINE_LENGTH];
-    int owner; //which thread is currently holding it, -1 means unheld
+    bool owned; //is it currently held, 0 means unheld
 } file_line_t;
 
 //data structure representing the contents of a file
@@ -156,6 +156,7 @@ int overwrite_line(int argc){//works for server only
       line_num_rep[i]='\0';//end the string early
     }
     fprintf(log_f, "line ''number'': %s\n", line_num_rep);
+    fflush(log_f);
     if (strcmp(line_num_rep, ":q")==0){
       break;
     }
@@ -168,11 +169,20 @@ int overwrite_line(int argc){//works for server only
     if (line_num == 0){
       return -3; //atoi error
     }
+    if (!our_file->contents[line_num].owned && argc == HOST_RUN){
+      our_file->contents[line_num].owned = true;
+    }
+    else if (argc == HOST_RUN){
+      fprintf(log_f, "HOST can't claim line %d, is already in use\n", line_num);
+      fflush(log_f);
+      return -4;
+    }
+    else if (argc == CLIENT_RUN){
+      send
+    }
+    //if (line_num)
     line_num--; //subtract 1
-
     //TODO: set the owner field of the line here
-    fprintf(log_f, "line we read: %d)\n", line_num);
-    fflush(log_f);
     //char overwrite_buf[MAX_LINE_LENGTH-1];
     clrtoeol(); // clears what was typed on input line after input is entered
     char overwriting = getch();//works fine
@@ -244,7 +254,7 @@ int overwrite_line(int argc){//works for server only
       }
        // CLIENT: send new changes to the host
     }else if (argc == CLIENT_RUN){
-      send_message(users->head->data, line_num_rep);
+      send_message(users->head->data, line_num_rep);//send a working line number, it is not blocked, you can have it
       send_message(users->head->data, our_file->contents[line_num].line_contents);
     }
     
@@ -329,7 +339,7 @@ void* recieve_and_distribute(void* arg){
           fflush(log_f2);
         }
         else{
-          memcpy(our_file->contents[j].line_contents,message,MAX_LINE_LENGTH);//copy the message into the local copy of the data structure
+          memcpy(our_file->contents[j].line_contents, message ,MAX_LINE_LENGTH);//copy the message into the local copy of the data structure
           fprintf(log_f2,"trying to write in: %s\n",our_file->contents[j].line_contents);
           fflush(log_f2);
         }
@@ -340,8 +350,32 @@ void* recieve_and_distribute(void* arg){
     }
     
     char* line_num_rep = receive_message(client_socket_fd);
-    char* message = receive_message(client_socket_fd);
+    int line_num;
+    int to_row; 
+    int row_index;
+    if(line_num_rep != NULL && argc == HOST_RUN){
+      line_num = atoi((const char*)line_num_rep);
+      to_row = line_num; 
+      row_index = line_num -1; //array place of the line
+      //start locking
+      pthread_mutex_lock(&lock);
+      if (!our_file->contents[row_index].owned){
+        our_file->contents[line_num].owned = true; //if it's not owned it is now
+        fprintf(log_f, "locked the line at index %d\n", line_num);
+        fflush(log_f);
+      }
+      else{
+        //this is where we send them a message
+        fprintf(log_f, "can't use the line at index %d because it's already owned\n", line_num);
+        fflush(log_f);
+        }
+      pthread_mutex_unlock(&lock);
+    }
+    else{
+      continue; //try the whole while loop again
+    }
 
+    char* message = receive_message(client_socket_fd);
     //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
     if(line_num_rep == NULL || message == NULL) { 
       //if the message received is null or the client is no longer connected, delete the client holding this client_socket_fd 
@@ -368,7 +402,7 @@ void* recieve_and_distribute(void* arg){
       }
       pthread_mutex_unlock(&lock);
       return NULL;
-    }else{
+    }else{ 
       if(argc == HOST_RUN){ // only the host needs to send to everyone
         pthread_mutex_lock(&lock);
         list_node_t* temp = users->head; 
@@ -397,9 +431,6 @@ void* recieve_and_distribute(void* arg){
     }
     
     //HOST & CLIENT: Print the new changes to personal screens
-    int line_num = atoi((const char*)line_num_rep);
-    int to_row = line_num; 
-    int row_index = line_num -1; //array place of the line 
     int i = 0;
     memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
     for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
@@ -514,6 +545,7 @@ int main(int argc, char **argv){
         char put_this;
         for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
             put_this=fgetc(real_file->file_ref);//read the first char of the file, for a starting off place
+            our_file->contents[file_lines].owned = false;
             for (int chars = 0; chars < (MAX_LINE_LENGTH-1); chars++){//if we didn't just break, start reading characters into lines
                 if (put_this != EOF && put_this != '\n'){//if it's the newline or EOF, stop reading into this line
                     our_file->contents[file_lines].line_contents[chars]= put_this;
