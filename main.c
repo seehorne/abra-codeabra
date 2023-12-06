@@ -21,7 +21,7 @@
 
 const char* username;
 const char* filename;
-// const int my_host;
+const int my_host;
 FILE* log_f;
 FILE* log_f2;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -129,7 +129,7 @@ void write_contents(){//works for client and server
     refresh();
 }
 
-int overwrite_line(int argc){
+int overwrite_line(int argc){//works for server only
   char line_num_rep[3];//make a char array of 2 slots for storing the line number
   line_num_rep[2]='\0';
   
@@ -169,14 +169,7 @@ int overwrite_line(int argc){
       return -3; //atoi error
     }
     line_num--; //subtract 1
-    int holding_user = our_file->contents[line_num].owner;
-    if (holding_user != -2 && argc== HOST_RUN){
-      our_file->contents[line_num].owner = -1; //marks it as in use
-    }
-    // else if (argc== HOST_RUN){//line was held
-    //   //TODO: print that the line was held somewhere
-    //   return -4; //claimed an in-use line
-    // }
+
     //TODO: set the owner field of the line here
     fprintf(log_f, "line we read: %d)\n", line_num);
     fflush(log_f);
@@ -250,17 +243,11 @@ int overwrite_line(int argc){
         pthread_mutex_unlock(&lock);
       }
        // CLIENT: send new changes to the host
-    // }else if (argc == CLIENT_RUN){
-    //   send_message(users->head->data, line_num_rep);
-    //   char* lock_check = receive_message(users->head->data);//wait for the server to send back a line to see if you're fine
-    //   //TODO: null check message
-    //   if (strcmp(lock_check, "y")==0){
-    //     send_message(users->head->data, our_file->contents[line_num].line_contents);
-    //   }
-    //   else {
-    //     return -4; //lock was claimed
-    //   }
+    }else if (argc == CLIENT_RUN){
+      send_message(users->head->data, line_num_rep);
+      send_message(users->head->data, our_file->contents[line_num].line_contents);
     }
+    
     //HOST & CLIENT: Print the new changes to personal screens
     int to_row = line_num+1; //+1 to undo the subtraction from indexing
     for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
@@ -351,27 +338,9 @@ void* recieve_and_distribute(void* arg){
 
       write_contents();
     }
-    //TODO: RECONSIDER NULL CHECK ORDER
-    char* line_num_rep = receive_message(client_socket_fd);//should probably null check earlier
-    char* message = receive_message(client_socket_fd);;
-    //int line_num = atoi((const char*)line_num_rep);
-    // if (our_file->contents[line_num].owner != -2){
-    //   pthread_mutex_lock(&lock);
-    //   our_file->contents[line_num].owner = client_socket_fd;
-    //   pthread_mutex_unlock(&lock);
-    //   send_message(client_socket_fd, "y"); //send y, for yes you can have that line
-    //   message = receive_message(client_socket_fd); //recieve their message
-    //   if (message != NULL){
-    //     pthread_mutex_lock(&lock);
-    //     our_file->contents[line_num].owner = -2; //mark it as an unclaimed line again
-    //     pthread_mutex_unlock(&lock);
-    //   }
-    // }
-    // else{//line is claimed
-    //   //TODO: alert them somehow
-    //   send_message(client_socket_fd, "n"); //send n, for no you cannot have that line
-    //   continue; //start the while loop over, don't execute anything below
-    // }
+    
+    char* line_num_rep = receive_message(client_socket_fd);
+    char* message = receive_message(client_socket_fd);
 
     //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
     if(line_num_rep == NULL || message == NULL) { 
@@ -428,18 +397,13 @@ void* recieve_and_distribute(void* arg){
     }
     
     //HOST & CLIENT: Print the new changes to personal screens
-    //int line_num = atoi((const char*)line_num_rep);
     int line_num = atoi((const char*)line_num_rep);
-    int to_row = line_num;
+    int to_row = line_num; 
     int row_index = line_num -1; //array place of the line 
     int i = 0;
-    //;
-    // int message_length = strlen(message);
-    // if (message_length > MAX_LINE_LENGTH-1){
-    //   message_length = MAX_LINE_LENGTH-1;
-    // }
     memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
     for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
+      
       mvaddch(to_row, col, message[i]);
       i++;
       wrefresh(ui_win);
@@ -448,8 +412,11 @@ void* recieve_and_distribute(void* arg){
     wrefresh(ui_win);
     move(0,0);//put the cursor back at the top
     wrefresh(ui_win);
-
-    //HOST: WRITE THE CHANGE BACK TO THE FILE
+      // This is a thread made by host recieving messages from clients
+      // therefore we need to:
+      // write to the host's screen.
+      // write to file
+        //HOST: WRITE THE CHANGE BACK TO THE FILE
     if (argc== HOST_RUN){
       fseek(real_file->file_ref, 0, SEEK_SET);
       fseek(real_file->file_ref, (row_index * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
@@ -457,11 +424,6 @@ void* recieve_and_distribute(void* arg){
       fwrite(our_file->contents[row_index].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed (all but newline)
       fseek(real_file->file_ref, 0, SEEK_SET); //move cursor back to the top
     }
-      // This is a thread made by host recieving messages from clients
-      // therefore we need to:
-      // write to the host's screen.
-      // write to file
-    
   }  
   return NULL;
 }
@@ -551,7 +513,6 @@ int main(int argc, char **argv){
         //when we launch threads, we probably want the void* to include the global file_rep as well
         char put_this;
         for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
-            our_file->contents[file_lines].owner = -2; //set all the lines up to be initially owned by no one (-1 will be host, clients will be their sockets)
             put_this=fgetc(real_file->file_ref);//read the first char of the file, for a starting off place
             for (int chars = 0; chars < (MAX_LINE_LENGTH-1); chars++){//if we didn't just break, start reading characters into lines
                 if (put_this != EOF && put_this != '\n'){//if it's the newline or EOF, stop reading into this line
