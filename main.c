@@ -21,10 +21,10 @@
 
 const char* username;
 const char* filename;
-const int my_host;
 FILE* log_f;
 FILE* log_f2;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+char buffer[100];
 
 /**
  * struct for 1 node in a linked list
@@ -72,6 +72,11 @@ typedef struct info_passing{
   int argc;
 } info_passing_t;
 
+typedef struct extended_info_passing{
+  info_passing_t info;
+  char** argv;
+} extended_info_passing_t;
+
 file_rep_t* our_file; //global struct to contain the file representation
 
 locking_file_t* real_file; //global struct to contain the actual file
@@ -100,32 +105,33 @@ char* int_to_string(int i){//works for client and server
 
 
 void write_contents(){//works for client and server
-    int row = 0;
+    int row = 1;
     int col = 0;
     for (; col < MAX_LINE_LENGTH; col++){
         mvaddch(row, col, ' ');
     }
     row++;
     col = 0;
-    for (; row <= MAX_LINE_COUNT; row++){
+    for (; row <= MAX_LINE_COUNT+1; row++){
         char* line_num = malloc((sizeof(char))*2);
-        memcpy(line_num, int_to_string(row), 2);
-        mvaddch(row, 0, line_num[0]);
-        mvaddch(row, 1, line_num[1]);
-        mvaddch(row, 2, ' ');
+        memcpy(line_num, int_to_string(row-1), 2);
+        mvaddch(row, 0, ' ');//leave space for asterisks
+        mvaddch(row, 1, line_num[0]);
+        mvaddch(row, 2, line_num[1]);
+        mvaddch(row, 3, ' ');
         // if (row < 10){
         //     mvaddch(row, 0, (row-'0'));
         // }
         // else{
         //     mvaddch(row, 0, 'X');
         // }
-        for (col = 3; col <= MAX_LINE_LENGTH+ 2; col++){
-        mvaddch(row, col, our_file->contents[row-1].line_contents[col-3]);
+        for (col = 4; col <= MAX_LINE_LENGTH+ 3; col++){
+        mvaddch(row, col, our_file->contents[row-2].line_contents[col-4]);
         }
         //refresh();
         wrefresh(ui_win);
     }
-    move(0,0);
+    move(1,0);
     refresh();
 }
 
@@ -249,13 +255,13 @@ int overwrite_line(int argc){//works for server only
     }
     
     //HOST & CLIENT: Print the new changes to personal screens
-    int to_row = line_num+1; //+1 to undo the subtraction from indexing
-    for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
-      mvaddch(to_row, col, our_file->contents[line_num].line_contents[col-3]);
+    int to_row = line_num+2; //+1 to undo the subtraction from indexing, +1 to adjust to connection line
+    for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
+      mvaddch(to_row, col, our_file->contents[line_num].line_contents[col-4]);
       wrefresh(ui_win);
     }
     wrefresh(ui_win);
-    move(0,0);//put the cursor back at the top
+    move(1,0);//put the cursor back at the top (but not over the connection message)
     wrefresh(ui_win);
   }
   return 0;
@@ -301,16 +307,22 @@ void list_add(int value) {
 */
 void* recieve_and_distribute(void* arg){
   bool newly_launched = true;
-  info_passing_t* unpacked = (info_passing_t*)arg;
-  int client_socket_fd = unpacked->port;
-  int argc = unpacked->argc;
+  extended_info_passing_t* unpacked = (extended_info_passing_t*)arg;
+  int client_socket_fd = unpacked->info.port;
+  int argc = unpacked->info.argc;
+  char** argv = unpacked->argv;
   //this while loop loops until this the client program does not exist
   while(true){
     //HOST: send the file rep contents to the newly connected client
     if (argc==HOST_RUN && newly_launched==true){
       int rc;
       for (int i = 0; i< MAX_LINE_COUNT; i++){
-        rc = send_message(client_socket_fd, our_file->contents[i].line_contents);
+        // if (i == 0){
+        //   rc = send_message(client_socket_fd, buffer);
+        // }
+        //else{
+          rc = send_message(client_socket_fd, our_file->contents[i].line_contents);
+        //}
       }
       if (rc==-1){
         fprintf(log_f, "I'm a host: didn't send the message ):\n");
@@ -328,6 +340,10 @@ void* recieve_and_distribute(void* arg){
           fprintf(log_f2, "I'm a client: didn't read/recieve the message ):\n");
           fflush(log_f2);
         }
+        // else if (j==MAX_LINE_COUNT){
+        //   memcpy(buffer,message,strlen(message));//last message 
+        //   mvaddstr(0, 0, buffer); //write this to the very top line
+        // }
         else{
           memcpy(our_file->contents[j].line_contents,message,MAX_LINE_LENGTH);//copy the message into the local copy of the data structure
           fprintf(log_f2,"trying to write in: %s\n",our_file->contents[j].line_contents);
@@ -335,7 +351,8 @@ void* recieve_and_distribute(void* arg){
         }
       }
       newly_launched=false;
-
+      sprintf(buffer, "user: %s, type: client\n", argv[1]);
+      mvaddstr(0, 0, buffer); //write this to the very top line
       write_contents();
     }
     
@@ -398,19 +415,18 @@ void* recieve_and_distribute(void* arg){
     
     //HOST & CLIENT: Print the new changes to personal screens
     int line_num = atoi((const char*)line_num_rep);
-    int to_row = line_num; 
+    int to_row = line_num+1; //adjust to the extra line at the top for connection info
     int row_index = line_num -1; //array place of the line 
     int i = 0;
     memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
-    for (int col = 3; col <= MAX_LINE_LENGTH + 2; col++){
-      
+    for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
       mvaddch(to_row, col, message[i]);
       i++;
       wrefresh(ui_win);
     }
     // mvaddstr(to_row, 3, message);
     wrefresh(ui_win);
-    move(0,0);//put the cursor back at the top
+    move(1,0);//put the cursor back at the top
     wrefresh(ui_win);
       // This is a thread made by host recieving messages from clients
       // therefore we need to:
@@ -434,9 +450,9 @@ void* recieve_and_distribute(void* arg){
 * \returns NULL if it ever manages to leave, which it should not be able to do
 **/
 void* add_user(void* arg){ //get socket out of arg
-  info_passing_t* unpacked = (info_passing_t*)arg;
-  int argc = unpacked->argc;
-  int socket_val = unpacked->port;
+  extended_info_passing_t* unpacked = (extended_info_passing_t*)arg;
+  int argc = unpacked->info.argc;
+  int socket_val = unpacked->info.port;
   int* socket = &socket_val;
   //running indefinitely looking for new connections
   while (true){
@@ -451,9 +467,10 @@ void* add_user(void* arg){ //get socket out of arg
     //lock while we accept the connection and add a client 
     pthread_mutex_lock(&lock);
     list_add(*client_socket_fd); 
-    info_passing_t pass;
-    pass.port = *client_socket_fd;
-    pass.argc = argc;
+    extended_info_passing_t pass;
+    pass.info.port = *client_socket_fd;
+    pass.info.argc = argc;
+    pass.argv = unpacked->argv;
     pthread_mutex_unlock(&lock);
     pthread_t disseminate_thread; //launches a thread to recieve from this connection and disseminate to other clients
     pthread_create(&disseminate_thread, NULL, recieve_and_distribute, &pass);
@@ -488,8 +505,6 @@ int main(int argc, char **argv){
         perror("listen failed"); 
         exit(EXIT_FAILURE);
     }
- 
-
     if(argc != HOST_RUN && argc !=CLIENT_RUN){
         fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>]\n", argv[0], argv[0]);
     }
@@ -498,7 +513,9 @@ int main(int argc, char **argv){
         filename = argv[2];
         // send the port 
         char info_message[200];
-        fprintf(log_f, "CONNECT TO %s WITH THIS PORT -> %d\n", username, port);
+        //char buffer[100];
+        sprintf(buffer, "user: %s, type: host, connect with port %d\n", username, port);
+        mvaddstr(0, 0, buffer); //write this to the very top line
         fflush(log_f);
         // TODO:  ncurses 
         // O_CREAT | O_RDWR| O_EXCL
@@ -560,9 +577,12 @@ int main(int argc, char **argv){
         // }
         // sleep(1000);
         // endwin();
-        info_passing_t arg;
-        arg.port = server_socket_fd;
-        arg.argc= argc;
+        info_passing_t args;
+        args.port = server_socket_fd;
+        args.argc= argc;
+        extended_info_passing_t arg;
+        arg.info = args;
+        arg.argv = argv;
         pthread_t listen_thread;
         if(pthread_create(&listen_thread, NULL, add_user, &arg)){//inside of host, listen for new clients
             perror("pthread failed"); 
@@ -581,9 +601,12 @@ int main(int argc, char **argv){
             exit(EXIT_FAILURE);
         }
         list_add(my_host);
-        info_passing_t arg;
-        arg.port = users->head->data;
-        arg.argc= argc;
+        info_passing_t args;
+        args.port = users->head->data;
+        args.argc= argc;
+        extended_info_passing_t arg;
+        arg.info = args;
+        arg.argv = argv;
         pthread_t disseminate_thread;
         if (pthread_create(&disseminate_thread, NULL, recieve_and_distribute,  &arg)) {
             perror("pthread_create failed");
