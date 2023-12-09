@@ -53,7 +53,7 @@ typedef struct locking_file{
 //structure for a file line, contents char[], int to represent who owns it
 typedef struct file_line {
     char line_contents[MAX_LINE_LENGTH];
-    int owner; //which thread is currently holding it, -1 means unheld
+    int num_of_owners; // how many people are using this line at this moment
 } file_line_t;
 
 //data structure representing the contents of a file
@@ -135,6 +135,69 @@ void write_contents(){//works for client and server
     refresh();
 }
 
+
+int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc){
+  //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
+  if(line_num_rep == NULL || message == NULL) { 
+    //if the message received is null or the client is no longer connected, delete the client holding this client_socket_fd 
+    pthread_mutex_lock(&lock);
+    if (users != NULL){
+      list_node_t* temp = users->head; 
+      if(temp->data == client_socket_fd){// if the client to be removed is the top client
+          users->head = temp->next;
+          free(temp);
+      }else{ // if the client isn't the first in the linked list find it and remove it
+        list_node_t* prev = temp;
+        temp = temp->next;
+        //loop through the link list to find the client that has this client socket fd
+        while(temp!= NULL){
+          if(temp->data == client_socket_fd){
+            prev->next = temp->next;
+            free(temp);
+            break;
+          }
+          prev = temp;
+          temp = temp->next;
+        }
+      }
+    }
+    pthread_mutex_unlock(&lock);
+    return -1;
+  }else{
+    if(argc == HOST_RUN){ // only the host needs to send to everyone
+      pthread_mutex_lock(&lock);
+      list_node_t* temp = users->head; 
+      while(temp!= NULL){
+        //check to send line number and message to other connected clients
+        if(temp->data != client_socket_fd || strcmp(message, " ")==0){//if it's a space, send it to who you got it from anyways
+          int rc = send_message(temp->data, line_num_rep);
+          if(rc == -1) {
+            perror("Failed to send line number to client");
+            pthread_mutex_unlock(&lock);
+            exit(EXIT_FAILURE);
+          }
+          // if (our_file->contents[line_num-1].num_of_owners > 0){
+          //   rc = send_message(temp->data, "*");
+          // }
+          // else{
+          //   rc = send_message(temp->data, " ");
+          // }
+          rc = send_message(temp->data, message);
+          if(rc == -1) {
+            perror("Failed to send message to client");
+            pthread_mutex_unlock(&lock);
+            exit(EXIT_FAILURE);
+          }
+        }
+        temp = temp->next;
+      }
+      pthread_mutex_unlock(&lock);
+    }
+  }
+  return 0; //0 on success
+}
+
+
 int overwrite_line(int argc){//works for server only
   char line_num_rep[3];//make a char array of 2 slots for storing the line number
   line_num_rep[2]='\0';
@@ -158,7 +221,6 @@ int overwrite_line(int argc){//works for server only
           fflush(log_f);
         }
         i++;
-        //i++;
       }
       c = getch();
     }
@@ -185,6 +247,25 @@ int overwrite_line(int argc){//works for server only
     }
     line_num--; //subtract 1
 
+    // Update the number of owners of a line
+    if(argc == HOST_RUN){
+      pthread_mutex_lock(&lock);
+      our_file->contents[line_num].num_of_owners++; // update the number of owners of this line
+      pthread_mutex_unlock(&lock);
+      // make everyone else print astriks for this line claim
+      distribute(-1, "*", line_num_rep, argc);// do not need to error check because this is the host and the line_num_rep and message are not NULL
+      
+    }else if(argc == CLIENT_RUN){ // CLIENT: tell the host they are using this line
+      send_message(users->head->data, line_num_rep);
+    }
+
+    mvaddch(line_num+2, 0, '*'); //print the astrisk to show line number claimed
+    wrefresh(ui_win);
+    move(1,0);
+    wrefresh(ui_win);
+    // }else if (argc == CLIENT_RUN){
+    //   send_message(users->head->data, line_num_rep); // send the line number to host
+    // }
     //TODO: set the owner field of the line here
     fprintf(log_f, "line we read: %d)\n", line_num);
     fflush(log_f);
@@ -236,11 +317,6 @@ int overwrite_line(int argc){//works for server only
       fseek(real_file->file_ref, (line_num * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
       // real_file->file_ref += (line_num * MAX_LINE_LENGTH);
       fwrite(our_file->contents[line_num].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed (all but newline)
-      // for (int i = 0; i < MAX_LINE_LENGTH-1; i++){
-      //     *real_file->file_ref = our_file->contents[line_num].line_contents[i];
-      //     real_file->file_ref++;
-      // }
-      //real_file->file_ref -= (line_num * MAX_LINE_LENGTH)+99;//put us back
       fseek(real_file->file_ref, 0, SEEK_SET);//put the cursor back at the top of the file
 
       // HOST: hosts sends the new change to the rest of the clients
@@ -263,6 +339,19 @@ int overwrite_line(int argc){//works for server only
           temp = temp->next;
         }
         pthread_mutex_unlock(&lock);
+      }
+
+      // HOST: Update the number of owners of a line
+      pthread_mutex_lock(&lock);
+      our_file->contents[line_num].num_of_owners--; // update the number of owners of this line
+      pthread_mutex_unlock(&lock);
+      // print to the host screen if the line is no longer in use
+      if(our_file->contents[line_num].num_of_owners == 0){
+          distribute(-1, " ", line_num_rep, argc);// let everyone know there is no one using this line
+          mvaddch(line_num+2, 0, ' '); //print the astrisk to show line number claimed
+          wrefresh(ui_win);
+          move(1,0);
+          wrefresh(ui_win);
       }
        // CLIENT: send new changes to the host
     }else if (argc == CLIENT_RUN){
@@ -371,94 +460,100 @@ void* recieve_and_distribute(void* arg){
       mvaddstr(0, 0, buffer); //write this to the very top line
       write_contents();
     }
-    
-    char* line_num_rep = receive_message(client_socket_fd);
-    char* message = receive_message(client_socket_fd);
 
-    //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
-    if(line_num_rep == NULL || message == NULL) { 
-      //if the message received is null or the client is no longer connected, delete the client holding this client_socket_fd 
-      pthread_mutex_lock(&lock);
-      if (users != NULL){
-        list_node_t* temp = users->head; 
-        if(temp->data == client_socket_fd){// if the client to be removed is the top client
-            users->head = temp->next;
-            free(temp);
-        }else{ // if the client isn't the first in the linked list find it and remove it
-          list_node_t* prev = temp;
-          temp = temp->next;
-          //loop through the link list to find the client that has this client socket fd
-          while(temp!= NULL){
-            if(temp->data == client_socket_fd){
-              prev->next = temp->next;
-              free(temp);
-              break;
-            }
-            prev = temp;
-            temp = temp->next;
-          }
-        }
-      }
-      pthread_mutex_unlock(&lock);
-      return NULL;
-    }else{
-      if(argc == HOST_RUN){ // only the host needs to send to everyone
+    char* line_num_rep;
+    // HOST: update the line number the client has just claimed
+    if(argc == HOST_RUN){
+      line_num_rep = receive_message(client_socket_fd);//recieve a line number
+      int line_num;
+      if(line_num_rep != NULL){
+        line_num = atoi(line_num_rep);
         pthread_mutex_lock(&lock);
-        list_node_t* temp = users->head; 
-        while(temp!= NULL){
-          //check to send line number and message to other connected clients
-          if(temp->data != client_socket_fd){
-            int rc = send_message(temp->data, line_num_rep);
-            if(rc == -1) {
-              perror("Failed to send line number to client");
-              pthread_mutex_unlock(&lock);
-              exit(EXIT_FAILURE);
-            }
-            rc = send_message(temp->data, message);
-            if(rc == -1) {
-              perror("Failed to send message to client");
-              pthread_mutex_unlock(&lock);
-              exit(EXIT_FAILURE);
-            }
-          }
-          temp = temp->next;
-        }
+        our_file->contents[line_num-1].num_of_owners++; // update the number of owners of this line
         pthread_mutex_unlock(&lock);
+        int rc = distribute(client_socket_fd,"*",line_num_rep,argc);//send out the asterisk to represent it being in use
+        if (rc == -1){
+          return NULL; //end this thread
+        }
+        mvaddch(line_num+1, 0, '*'); //print the astrisk to show line number claimed
+        wrefresh(ui_win);
+        move(1,0);
+        wrefresh(ui_win);
       }
-      fprintf(log_f,"From Client: %s %s\n",line_num_rep, message);
-      fflush(log_f);
     }
-    
+
+    line_num_rep = receive_message(client_socket_fd);//recieve a line number
+    char* message = receive_message(client_socket_fd);
+    //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
+    int rc = distribute(client_socket_fd, message, line_num_rep, argc);//distribute the message
+    if (rc == -1){
+      return NULL; //end this thread
+    }
+    if (argc == HOST_RUN){
+      int line_num;
+      if(line_num_rep != NULL){
+        line_num = atoi(line_num_rep);
+        pthread_mutex_lock(&lock);
+        our_file->contents[line_num-1].num_of_owners--; // update the number of owners of this line
+        pthread_mutex_unlock(&lock);
+        if (our_file->contents[line_num-1].num_of_owners == 0){
+          rc =distribute(client_socket_fd," ",line_num_rep,argc);//if its not in use by anyone anymore, make sure there's no asterisk
+          if (rc == -1){
+            return NULL; //end this thread
+          }
+          mvaddch(line_num+1, 0, ' ');//first char in message here is the usage thing
+          wrefresh(ui_win);
+          move(1,0);
+          wrefresh(ui_win);
+        }
+      }
+    }
     //HOST & CLIENT: Print the new changes to personal screens
     int line_num = atoi((const char*)line_num_rep);
     int to_row = line_num+1; //adjust to the extra line at the top for connection info
     int row_index = line_num -1; //array place of the line 
     int i = 0;
-    memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
-    for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
-      mvaddch(to_row, col, message[i]);
-      i++;
+    if (argc == CLIENT_RUN && strcmp(message," ")==0 ){
+      mvaddch(to_row, 0, ' ');//first char in message here is the usage thing
+      wrefresh(ui_win);
+      move(1,0);
       wrefresh(ui_win);
     }
-    // mvaddstr(to_row, 3, message);
-    wrefresh(ui_win);
-    move(1,0);//put the cursor back at the top
-    wrefresh(ui_win);
-      // This is a thread made by host recieving messages from clients
-      // therefore we need to:
-      // write to the host's screen.
-      // write to file
-        //HOST: WRITE THE CHANGE BACK TO THE FILE
-    if (argc== HOST_RUN){
-      fseek(real_file->file_ref, 0, SEEK_SET);
-      fseek(real_file->file_ref, (row_index * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
-      // real_file->file_ref += (line_num * MAX_LINE_LENGTH);
-      fwrite(our_file->contents[row_index].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed (all but newline)
-      fseek(real_file->file_ref, 0, SEEK_SET); //move cursor back to the top
+    else if (argc == CLIENT_RUN && strcmp(message,"*")==0){
+      mvaddch(to_row, 0, '*');//first char in message here is the usage thing
+      wrefresh(ui_win);
+      move(1,0);
+      wrefresh(ui_win);
+    }
+    else{
+      memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
+      for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
+        mvaddch(to_row, col, message[i]);
+        i++;
+        wrefresh(ui_win);
+      }
+      // mvaddstr(to_row, 3, message);
+      wrefresh(ui_win);
+      move(1,0);//put the cursor back at the top
+      wrefresh(ui_win);
+        // This is a thread made by host recieving messages from clients
+        // therefore we need to:
+        // write to the host's screen.
+        // write to file
+          //HOST: WRITE THE CHANGE BACK TO THE FILE
+      if (argc== HOST_RUN){
+        fseek(real_file->file_ref, 0, SEEK_SET);
+        fseek(real_file->file_ref, (row_index * MAX_LINE_LENGTH), SEEK_CUR);//go to the right line in the file
+        // real_file->file_ref += (line_num * MAX_LINE_LENGTH);
+        fwrite(our_file->contents[row_index].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything that changed (all but newline)
+        fseek(real_file->file_ref, 0, SEEK_SET); //move cursor back to the top
+      }
     }
   }  
   return NULL;
 }
+
+
 /**
 * add_user
 * connects a client to you, and adds them to your list of connections 
@@ -571,6 +666,7 @@ int main(int argc, char **argv){
             freopen(filename, "w+", real_file->file_ref);//overwrite it so we can write our data structure to it
         }
         for (int num_lines = 0; num_lines < MAX_LINE_COUNT; num_lines++){
+            our_file->contents[num_lines].num_of_owners = 0; //initialize all the lines number of owners to 0
             if (num_lines == MAX_LINE_COUNT-1){
                 fwrite(our_file->contents[num_lines].line_contents, 1, MAX_LINE_LENGTH-1, real_file->file_ref); //write everything but the newline for the last line
             }
