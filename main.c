@@ -140,16 +140,25 @@ int overwrite_line(int argc){//works for server only
   line_num_rep[2]='\0';
   
   while (strcmp(line_num_rep, ":q")!=0){//run until quit
-    char c = getch();
+    int c = getch();
     int i = 0;
     //loop to collect the line number from the terminal
     while (c != '\n'){
-      if (c != ERR){
-        // making sure there is only two digits
-        if (i < 2){
-          line_num_rep[i]= c;
+      if(c != ERR){
+        if(c == KEY_BACKSPACE || c == KEY_DC || c == 127 ){ // check for backspace and delete input and handle it
+          delch(); // delete the previous character typed
+          refresh();
+          c = getch();
+          i--; // decrement so that the previous character can now be overwritten
+          continue;
+        }
+        if (i < 2){// making sure there is only two digits
+          line_num_rep[i]= (char)c;
+          fprintf(log_f, "typecasted char %c \n", (char) c );
+          fflush(log_f);
         }
         i++;
+        //i++;
       }
       c = getch();
     }
@@ -181,7 +190,7 @@ int overwrite_line(int argc){//works for server only
     fflush(log_f);
     //char overwrite_buf[MAX_LINE_LENGTH-1];
     clrtoeol(); // clears what was typed on input line after input is entered
-    char overwriting = getch();//works fine
+    int overwriting = getch();//works fine
     i = 0; //reset the index overwriter
 
     // loop to collect what they want to write to this line (collecting character by character)
@@ -189,8 +198,15 @@ int overwrite_line(int argc){//works for server only
       if (overwriting != ERR){
         fprintf(log_f, "char we allegedly read: %c\n", overwriting);
         fflush(log_f);
+        if(overwriting == KEY_BACKSPACE || overwriting == KEY_DC || overwriting == 127 ){ // check for backspace and delete input and handle it
+          delch(); // delete the previous character typed
+          refresh();
+          overwriting = getch();
+          i--;
+          continue;
+        }
         if (i < MAX_LINE_LENGTH-1){ // enforcing the 100 character per line limit  
-            our_file->contents[line_num].line_contents[i]= overwriting;// store the character in the file representation
+            our_file->contents[line_num].line_contents[i]= (char)overwriting;// store the character in the file representation
             // overwrite_buf[i]=overwriting;
             // fprintf(log_f, "new buffer content new: %c\n", overwriting);
             // fflush(log_f);
