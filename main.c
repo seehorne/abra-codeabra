@@ -514,9 +514,13 @@ void* recieve_and_distribute(void* arg){
         if (rc == -1){
           return NULL; //end this thread
         }
+        pthread_mutex_lock(&lock);
+        int xcoor = getcurx(ui_win);
+        int ycoor = getcury(ui_win);
+        pthread_mutex_unlock(&lock);
         mvaddch(line_num+1, 0, '*'); //print the astrisk to show line number claimed
-        wrefresh(ui_win);
-        move(1,10);
+        //wrefresh(ui_win);
+        move(ycoor,xcoor);
         wrefresh(ui_win);
       }
     }
@@ -540,9 +544,13 @@ void* recieve_and_distribute(void* arg){
           if (rc == -1){
             return NULL; //end this thread
           }
+        pthread_mutex_lock(&lock);
+        int xcoor = getcurx(ui_win);
+        int ycoor = getcury(ui_win);
+        pthread_mutex_unlock(&lock);
           mvaddch(line_num+1, 0, ' ');//first char in message here is the usage thing
-          wrefresh(ui_win);
-          move(1,10);
+          //wrefresh(ui_win);
+          move(ycoor,xcoor);
           wrefresh(ui_win);
         }
       }
@@ -553,27 +561,39 @@ void* recieve_and_distribute(void* arg){
     int row_index = line_num -1; //array place of the line 
     int i = 0;
     if (argc == CLIENT_RUN && strcmp(message," ")==0 ){
+      pthread_mutex_lock(&lock);
+      int xcoor = getcurx(ui_win);
+      int ycoor = getcury(ui_win);
+      pthread_mutex_unlock(&lock);
       mvaddch(to_row, 0, ' ');//first char in message here is the usage thing
+      move(ycoor,xcoor);
       wrefresh(ui_win);
-      move(1,10);
       wrefresh(ui_win);
     }
     else if (argc == CLIENT_RUN && strcmp(message,"*")==0){
+      pthread_mutex_lock(&lock);
+      int xcoor = getcurx(ui_win);
+      int ycoor = getcury(ui_win);
+      pthread_mutex_unlock(&lock);
       mvaddch(to_row, 0, '*');//first char in message here is the usage thing
+      move(ycoor,xcoor);
       wrefresh(ui_win);
-      move(1,10);
       wrefresh(ui_win);
     }
     else{
       memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
+      pthread_mutex_lock(&lock);
+      int xcoor = getcurx(ui_win);
+      int ycoor = getcury(ui_win);
+      pthread_mutex_unlock(&lock);
       for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
         mvaddch(to_row, col, message[i]);
         i++;
-        wrefresh(ui_win);
+        //wrefresh(ui_win);
       }
       // mvaddstr(to_row, 3, message);
-      wrefresh(ui_win);
-      move(1,10);//put the cursor back at the top
+      //wrefresh(ui_win);
+      move(ycoor,xcoor);//put the cursor back at the top
       wrefresh(ui_win);
         // This is a thread made by host recieving messages from clients
         // therefore we need to:
