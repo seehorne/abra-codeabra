@@ -131,11 +131,11 @@ void write_contents(){//works for client and server
         //refresh();
         wrefresh(ui_win);
     }
-    move(1,0);
+    move(1,10);
     refresh();
 }
 
-
+//TODO: this might crash, check it
 int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc){
   //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
   if(line_num_rep == NULL || message == NULL) { 
@@ -166,6 +166,7 @@ int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc
   }else{
     if(argc == HOST_RUN){ // only the host needs to send to everyone
       pthread_mutex_lock(&lock);
+      if (users != NULL){
       list_node_t* temp = users->head; 
       while(temp!= NULL){
         //check to send line number and message to other connected clients
@@ -193,6 +194,7 @@ int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc
       }
       pthread_mutex_unlock(&lock);
     }
+    }
   }
   return 0; //0 on success
 }
@@ -203,10 +205,15 @@ int overwrite_line(int argc){//works for server only
   line_num_rep[2]='\0';
   
   while (strcmp(line_num_rep, ":q")!=0){//run until quit
+    mvaddstr(1, 0, "Line num: "); 
+    wrefresh(ui_win);
+    
     int c = getch();
     int i = 0;
+
     //loop to collect the line number from the terminal
     while (c != '\n'){
+
       if(c != ERR){
         if(c == KEY_BACKSPACE || c == KEY_DC || c == 127 ){ // check for backspace and delete input and handle it
           delch(); // delete the previous character typed
@@ -253,15 +260,22 @@ int overwrite_line(int argc){//works for server only
       our_file->contents[line_num].num_of_owners++; // update the number of owners of this line
       pthread_mutex_unlock(&lock);
       // make everyone else print astriks for this line claim
+      if (users != NULL && users->head !=NULL){//if the list has been intialized and currently has contents
       distribute(-1, "*", line_num_rep, argc);// do not need to error check because this is the host and the line_num_rep and message are not NULL
-      
+      }
     }else if(argc == CLIENT_RUN){ // CLIENT: tell the host they are using this line
-      send_message(users->head->data, line_num_rep);
+      if (users->head == NULL){//the host has left
+        return -5; //error code for host left
+      }
+      int rc = send_message(users->head->data, line_num_rep);
+      // if (rc == -1){
+      //   return -5; //error code for host left
+      // }
     }
 
     mvaddch(line_num+2, 0, '*'); //print the astrisk to show line number claimed
     wrefresh(ui_win);
-    move(1,0);
+    move(1,10);
     wrefresh(ui_win);
     // }else if (argc == CLIENT_RUN){
     //   send_message(users->head->data, line_num_rep); // send the line number to host
@@ -271,6 +285,11 @@ int overwrite_line(int argc){//works for server only
     fflush(log_f);
     //char overwrite_buf[MAX_LINE_LENGTH-1];
     clrtoeol(); // clears what was typed on input line after input is entered
+
+    //prompt user to input the contents
+    mvaddstr(1, 0, "Contents: "); 
+    wrefresh(ui_win);
+
     int overwriting = getch();//works fine
     i = 0; //reset the index overwriter
 
@@ -347,16 +366,33 @@ int overwrite_line(int argc){//works for server only
       pthread_mutex_unlock(&lock);
       // print to the host screen if the line is no longer in use
       if(our_file->contents[line_num].num_of_owners == 0){
+        if (users !=NULL && users->head != NULL){//if the list has been initialized and currently has contents
           distribute(-1, " ", line_num_rep, argc);// let everyone know there is no one using this line
+        }
           mvaddch(line_num+2, 0, ' '); //print the astrisk to show line number claimed
           wrefresh(ui_win);
-          move(1,0);
+          move(1,10);
           wrefresh(ui_win);
       }
        // CLIENT: send new changes to the host
     }else if (argc == CLIENT_RUN){
+      if (users->head == NULL){//the host has left
+        return -5; //error code for host left
+      }
       send_message(users->head->data, line_num_rep);
+      if (users->head == NULL){//the host has left
+        return -5; //error code for host left
+      }
+      // if (rc == -1){
+      //   return -5; //error code for host left
+      // }
       send_message(users->head->data, our_file->contents[line_num].line_contents);
+      // if (users->head == NULL){//the host has left
+      //   return -5; //error code for host left
+      // }
+      // if (rc == -1){
+      //   return -5; //error code for host left
+      // }
     }
     
     //HOST & CLIENT: Print the new changes to personal screens
@@ -366,7 +402,7 @@ int overwrite_line(int argc){//works for server only
       wrefresh(ui_win);
     }
     wrefresh(ui_win);
-    move(1,0);//put the cursor back at the top (but not over the connection message)
+    move(1,10);//put the cursor back at the top (but not over the connection message)
     wrefresh(ui_win);
   }
   return 0;
@@ -459,6 +495,9 @@ void* recieve_and_distribute(void* arg){
       sprintf(buffer, "user: %s, type: client\n", argv[1]);
       mvaddstr(0, 0, buffer); //write this to the very top line
       write_contents();
+      //prompt user to input the line num
+      mvaddstr(1, 0, "Line num: "); 
+      wrefresh(ui_win);
     }
 
     char* line_num_rep;
@@ -477,7 +516,7 @@ void* recieve_and_distribute(void* arg){
         }
         mvaddch(line_num+1, 0, '*'); //print the astrisk to show line number claimed
         wrefresh(ui_win);
-        move(1,0);
+        move(1,10);
         wrefresh(ui_win);
       }
     }
@@ -503,7 +542,7 @@ void* recieve_and_distribute(void* arg){
           }
           mvaddch(line_num+1, 0, ' ');//first char in message here is the usage thing
           wrefresh(ui_win);
-          move(1,0);
+          move(1,10);
           wrefresh(ui_win);
         }
       }
@@ -516,13 +555,13 @@ void* recieve_and_distribute(void* arg){
     if (argc == CLIENT_RUN && strcmp(message," ")==0 ){
       mvaddch(to_row, 0, ' ');//first char in message here is the usage thing
       wrefresh(ui_win);
-      move(1,0);
+      move(1,10);
       wrefresh(ui_win);
     }
     else if (argc == CLIENT_RUN && strcmp(message,"*")==0){
       mvaddch(to_row, 0, '*');//first char in message here is the usage thing
       wrefresh(ui_win);
-      move(1,0);
+      move(1,10);
       wrefresh(ui_win);
     }
     else{
@@ -534,7 +573,7 @@ void* recieve_and_distribute(void* arg){
       }
       // mvaddstr(to_row, 3, message);
       wrefresh(ui_win);
-      move(1,0);//put the cursor back at the top
+      move(1,10);//put the cursor back at the top
       wrefresh(ui_win);
         // This is a thread made by host recieving messages from clients
         // therefore we need to:
@@ -701,6 +740,9 @@ int main(int argc, char **argv){
             exit(EXIT_FAILURE);
         }
         write_contents();
+        //prompt user to input the line num
+        mvaddstr(1, 0, "Line num: "); 
+        wrefresh(ui_win);
     }
     if (argc == CLIENT_RUN){//connecting to editing session
         //TODO: set up connection
@@ -720,7 +762,7 @@ int main(int argc, char **argv){
         arg.info = args;
         arg.argv = argv;
         pthread_t disseminate_thread;
-        if (pthread_create(&disseminate_thread, NULL, recieve_and_distribute,  &arg)) {
+        if (pthread_create(&disseminate_thread, NULL, recieve_and_distribute, &arg)) {
             perror("pthread_create failed");
             exit(EXIT_FAILURE);
         }
@@ -732,12 +774,26 @@ int main(int argc, char **argv){
     // write_contents();
     // pthread_mutex_unlock(&lock);
     //draw_form();
+
+    
     int close_time = overwrite_line(argc);
     while (close_time != 0){
       //pthread_mutex_lock(&lock);
         clrtoeol(); // clears what was typed on input line after input is entered
+        wrefresh(ui_win);
+        //prompt user to input the line num
+        // mvaddstr(1, 0, "Line #: "); 
+        // wrefresh(ui_win);
         close_time = overwrite_line(argc); //run until we exit normally
         //pthread_mutex_unlock(&lock);
+        if (close_time == -5 && argc == CLIENT_RUN){
+          wclear(ui_win);
+          wrefresh(ui_win);
+          mvaddstr(0, 0, "Host terminated session, you no longer have document access");
+          wrefresh(ui_win);
+          sleep(5);
+          break; //exit while loop
+        }
     }
     if (argc==HOST_RUN){
       fclose(real_file->file_ref);
