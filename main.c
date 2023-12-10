@@ -25,6 +25,7 @@ FILE* log_f;
 FILE* log_f2;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 char buffer[100];
+char* claim_indicators[MAX_LINE_COUNT];
 
 /**
  * struct for 1 node in a linked list
@@ -104,7 +105,7 @@ char* int_to_string(int i){//works for client and server
 }
 
 
-void write_contents(){//works for client and server
+void write_contents(int argc){//works for client and server
     int row = 1;
     int col = 0;
     for (; col < MAX_LINE_LENGTH; col++){
@@ -113,9 +114,14 @@ void write_contents(){//works for client and server
     row++;
     col = 0;
     for (; row <= MAX_LINE_COUNT+1; row++){
-        char* line_num = malloc((sizeof(char))*2);
+        char* line_num = malloc((sizeof(char))*2);//has been freed
         memcpy(line_num, int_to_string(row-1), 2);
+        if (argc == CLIENT_RUN){
+          mvaddstr(row, 0, claim_indicators[row-2]);//add whatever line claim is currently true
+        }
+        else{
         mvaddch(row, 0, ' ');//leave space for asterisks
+        }
         mvaddch(row, 1, line_num[0]);
         mvaddch(row, 2, line_num[1]);
         mvaddch(row, 3, ' ');
@@ -130,6 +136,7 @@ void write_contents(){//works for client and server
         }
         //refresh();
         wrefresh(ui_win);
+        free(line_num);
     }
     move(1,10);
     refresh();
@@ -462,12 +469,21 @@ void* recieve_and_distribute(void* arg){
         //   rc = send_message(client_socket_fd, buffer);
         // }
         //else{
-          rc = send_message(client_socket_fd, our_file->contents[i].line_contents);
-        //}
+      if (our_file->contents[i].num_of_owners == 0){
+        rc = send_message(client_socket_fd, " ");
+      }
+      else{
+        rc = send_message(client_socket_fd, "*");
       }
       if (rc==-1){
         fprintf(log_f, "I'm a host: didn't send the message ):\n");
         fflush(log_f);
+      }
+      rc = send_message(client_socket_fd, our_file->contents[i].line_contents);
+      if (rc==-1){
+        fprintf(log_f, "I'm a host: didn't send the message ):\n");
+        fflush(log_f);
+      }
       }
       newly_launched=false;
     }
@@ -476,6 +492,11 @@ void* recieve_and_distribute(void* arg){
       fprintf(log_f2, "made it into client\n");
       fflush(log_f2);
       for (int j = 0; j<MAX_LINE_COUNT; j++){
+        char* claimed = receive_message(client_socket_fd);
+        if (claimed == NULL){//did not recieve message
+          fprintf(log_f2, "I'm a client: didn't read/recieve the message ):\n");
+          fflush(log_f2);
+        }
         char* message = receive_message(client_socket_fd);
         if (message == NULL){//did not recieve message
           fprintf(log_f2, "I'm a client: didn't read/recieve the message ):\n");
@@ -486,6 +507,8 @@ void* recieve_and_distribute(void* arg){
         //   mvaddstr(0, 0, buffer); //write this to the very top line
         // }
         else{
+          claim_indicators[j] = malloc(strlen(claimed));//will get freed
+          memcpy(claim_indicators[j],claimed,strlen(claimed));//2 for the char and the null terminator
           memcpy(our_file->contents[j].line_contents,message,MAX_LINE_LENGTH);//copy the message into the local copy of the data structure
           fprintf(log_f2,"trying to write in: %s\n",our_file->contents[j].line_contents);
           fflush(log_f2);
@@ -494,7 +517,7 @@ void* recieve_and_distribute(void* arg){
       newly_launched=false;
       sprintf(buffer, "user: %s, type: client\n", argv[1]);
       mvaddstr(0, 0, buffer); //write this to the very top line
-      write_contents();
+      write_contents(CLIENT_RUN);
       //prompt user to input the line num
       mvaddstr(1, 0, "Line num: "); 
       wrefresh(ui_win);
@@ -659,8 +682,8 @@ int main(int argc, char **argv){
     fflush(log_f2);
 
     bool pre_existing = true;
-    our_file = malloc(sizeof(file_rep_t));
-    real_file = malloc(sizeof(locking_file_t));
+    our_file = malloc(sizeof(file_rep_t));//gets freed
+    real_file = malloc(sizeof(locking_file_t));//gets freed
     pthread_mutex_init(&real_file->file_lock, NULL);
     
     //Set up a server socket to accept incoming connections
@@ -759,7 +782,7 @@ int main(int argc, char **argv){
             perror("pthread failed"); 
             exit(EXIT_FAILURE);
         }
-        write_contents();
+        write_contents(HOST_RUN);
         //prompt user to input the line num
         mvaddstr(1, 0, "Line num: "); 
         wrefresh(ui_win);
@@ -821,5 +844,10 @@ int main(int argc, char **argv){
     fclose(log_f);
     fclose(log_f2);
     endwin();
+    free(our_file);
+    free(real_file);
+    for (int i=0; i < MAX_LINE_COUNT; i++){
+      free(claim_indicators[i]);
+    }
     return 0;
 } 
