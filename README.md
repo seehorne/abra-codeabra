@@ -68,6 +68,11 @@ This project is a collaborative code editor that can be run on Mathlan.
     <li>A space indicates the line is not currently in use by any user</li>
   </ul>
   </li>
+  <li>If the host quits, the next time a client gives input, they will recieve a screen saying the host has terminated the session and they no longer have file access
+    <ul>
+      <li>This message will persist for 5 seconds, after which the client program will also terminate</li>
+    </ul>
+  </li>
 </ul>
 
 ### file requirements
