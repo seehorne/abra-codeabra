@@ -9,7 +9,7 @@ This project is a collaborative code editor that can be run on Mathlan.
   <li>To run this program, use one of the following two command line prompts:
   <ol>
     <li>To launch a <strong>new</strong> editing session: <code>./main &ltusername&gt &ltfilepath&gt</code> </li>
-      <ul> <li> If you are starting the editing session but are not the owner of the file to be edited, please ensure you have, at minimum, rw permissions to the file at your filepath before running</li></ul>
+      <ul> <li> If you are starting the editing session you will be the owner of the file. Clients connecting can edit and view a representation of the file, but once the session ends the real file is only saved to the host's directory.</li></ul>
     <li>To join an <strong>existing</strong> editing session: <code>./main &ltusername&gt &lthostname&gt &ltsocket to connect to&gt</code></li>
       <ul>
         <li> hostname refers to the machine the session host is using, not the host's username</li>
