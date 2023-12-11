@@ -52,6 +52,24 @@ This project is a collaborative code editor that can be run on Mathlan.
   </li>
 </ul>
 
+### how to read the UI
+<ul>
+  <li>The top line of the UI will have the username, whether the user is a host or client, and if host, the port to connect to</li>
+  <li>The second line will be where to type, and there will be a prompt for what is expected to be there
+    <ul>
+      <li>If the prompt says Line num: put in a line number 1-40, matching the line of the file you want to edit, or :q to quit</li>
+      <li>If the prompt says Contents: put in what you want written at the line you previously specified</li>
+    </ul>
+  </li>
+  <li>The next 40 lines represent what is currently stored at each line of the file</li>
+  <li>Each of these 40 lines has either an asterisk or space in front of the line number
+  <ul>
+    <li>An asterisk indicates that the line is in use by at least one other user</li>
+    <li>A space indicates the line is not currently in use by any user</li>
+  </ul>
+  </li>
+</ul>
+
 ### file requirements
 <ul>
 <li> The collaborative code editor supports the editing of documents with at most 40 lines, with lines of at most 100 characters each. Please take care to ensure files you edit with collaborative-code-editor meet these requirements.
