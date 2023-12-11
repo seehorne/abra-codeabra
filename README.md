@@ -3,6 +3,21 @@ Grinnell College CSC-213 Fall '23 Final Project
 ## description
 This project is a collaborative code editor that can be run on Mathlan.
 ## general use
+### how to set up
+<ul>
+  <li>
+    In order to run this program, you will need the following .c and .h files (all listed on this Github)
+    <ul>
+      <li>main.c: the main program</li>
+      <li>message.c: file to send and recieve messages, adapted from p2p lab</li>
+      <li>message.h: header file for message.c, from p2p lab</li>
+      <li>socket.h: header file for distributed systems, from p2p lab</li>
+      <li>Makefile: file to help compile and run the project</li>
+    </ul>
+  </li>
+  <li>These files can be downloaded from this <a href=https://github.com/seehorne/abra-codeabra> Github repo</a> </li>
+</ul>
+        
 ### how to interact
 <ul>
   <li>To compile this program, type <code>make main</code> in your terminal.</li>
