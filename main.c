@@ -9,7 +9,6 @@
 #include <pthread.h>
 #include <string.h>
 #include <form.h>
-#include "ui.h"
 #include "socket.h"
 #include "message.h"
 
@@ -414,21 +413,8 @@ int overwrite_line(int argc){//works for server only
   }
   return 0;
 }
+ 
 
-
-/**
-* This function is run whenever the user hits enter after typing a message
-* Sends the message to the original sender's connection
-* \param message the message typed in from the user interaction pane
-**/
-
-void input_callback(const char* message) {
-  if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0) {
-    ui_exit();
-  } else {
-    ui_display(username, message);
-  }
-}
 /**
  * adds the new node of peer data to the front of users
  * \param value the data to be added to the list
