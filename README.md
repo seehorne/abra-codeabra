@@ -16,11 +16,26 @@ This project is a collaborative code editor that can be run on Mathlan.
     </ul>
   </li>
   <li>These files can be downloaded from this <a href=https://github.com/seehorne/abra-codeabra> Github repo</a> </li>
+  <li>You will need them all in one directory, on a system that is able to run C with the following libraries:
+  <ul>
+    <li>curses.h</li>
+    <li>stdio.h</li>
+    <li>stdlib.h</li>
+    <li>unistd.h</li>
+    <li>errno.h</li>
+    <li>fcntl.h</li>
+    <li>sys/stat.h</li>
+    <li>stdbool.h</li>
+    <li>pthread.h</li>
+    <li>string.h</li>
+  </ul>
+    <li>These directories do not need to be preinstalled, you just need a version of C that can run them</li>
+  </li>
 </ul>
         
 ### how to interact
 <ul>
-  <li>To compile this program, type <code>make main</code> in your terminal.</li>
+  <li>To compile this program, while in the directory with the aforementioned files, type <code>make main</code> in your terminal.</li>
   <li>To run this program, use one of the following two command line prompts:
   <ol>
     <li>To launch a <strong>new</strong> editing session: <code>./main &ltusername&gt &ltfilepath&gt</code> </li>
