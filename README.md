@@ -29,7 +29,7 @@ This project is a collaborative code editor that can be run on Mathlan.
     <li>pthread.h</li>
     <li>string.h</li>
   </ul>
-    <li>These directories do not need to be preinstalled, you just need a version of C that can run them</li>
+    <li>These libraries do not need to be preinstalled, you just need a version of C that can run them</li>
   </li>
 </ul>
         
