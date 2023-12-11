@@ -6,8 +6,8 @@ all: main
 clean:
 	rm -f main
 
-main: main.c ui.c ui.h message.h 
-	$(CC) $(CFLAGS) -o main main.c ui.c message.c -lform -lncurses -lpthread
+main: main.c  message.h 
+	$(CC) $(CFLAGS) -o main main.c  message.c -lform -lncurses -lpthread
 
 zip:
 	@echo "Generating main.zip file to submit to Gradescope..."
