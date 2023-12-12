@@ -179,6 +179,8 @@ This project is a collaborative code editor that can be run on Mathlan.
   <li>It clears her screen and exits curses mode, so she can use her terminal normally again</li>
   <li>Because she is a client, not the host, this does not impact the other users at all</li>
   </ol>
+</li>
+  
 </li>Amani has a meeting to go to, so she needs to leave too.
   <li>By typing :q where the line number would have otherwise gone, she is able to quit the program</li>
   <li>It clears her screen and exits curses mode, so she can use her terminal normally again</li>
@@ -189,6 +191,7 @@ This project is a collaborative code editor that can be run on Mathlan.
       <li>They will each experience this behavior separately, based on their own inputs, not each others'.</li>
       </ul>
     </li> </ul>
+  </li>
   </li>
   </ol>
 </ol>
