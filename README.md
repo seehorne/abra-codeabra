@@ -6,7 +6,7 @@ This project is a collaborative code editor that can be run on Mathlan.
 ### how to set up
 <ul>
   <li>
-    In order to run this program, you will need the following .c and .h files (all listed on this Github)
+    In order to run this program, you will need the following .c and .h files (all listed on this <a href=https://github.com/seehorne/abra-codeabra> Github repo</a>)
     <ul>
       <li>main.c: the main program</li>
       <li>message.c: file to send and recieve messages, adapted from p2p lab</li>
