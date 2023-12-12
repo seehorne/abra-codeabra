@@ -94,7 +94,7 @@ This project is a collaborative code editor that can be run on Mathlan.
   <li>Line contents submitted by users are not allowed to be a " " (a single space and nothing else) or "*" (a single asterisk and nothing else)
     <ul>
       <li>This is because these messages are used to denote marking a given line as used or unused, and there is no way to distinguish the two possible use cases</li>
-      <li>If either of these messages are needed for visual effect, we recommend "* " (asterisk+space) in place of asterisk and "  "(two spaces) in place of space</li>
+      <li>If either of these messages are needed for visual effect, we recommend "* " (asterisk+space) in place of asterisk and two spaces in place of space</li>
     </ul>
   </li>
 </ul>
