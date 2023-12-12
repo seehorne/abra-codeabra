@@ -88,6 +88,17 @@ This project is a collaborative code editor that can be run on Mathlan.
   </li>
 </ul>
 
+### line content restrictions
+<ul>
+  <li>Like the original file lines, users cannot write content longer than 100 characters to lines, the program stops reading characters past 100</li>
+  <li>Line contents submitted by users are not allowed to be a " " (a single space and nothing else) or "*" (a single asterisk and nothing else)
+    <ul>
+      <li>This is because these messages are used to denote marking a given line as used or unused, and there is no way to distinguish the two possible use cases</li>
+      <li>If either of these messages are needed for visual effect, we recommend "* " (asterisk+space) in place of asterisk and "  "(two spaces) in place of space</li>
+    </ul>
+  </li>
+</ul>
+
 ## example usage
 <ol>
   <li>Amani wants to host an editing session for her lab, <code>some213.c</code>. She is on the computer wilkinson.grinnell.cs.edu</li> <li>She runs the program using the command line arguments, <code>./main amani /home/csc213/labs/some213.c</code>, which is a correct filepath to her <code>some213.c</code> lab
