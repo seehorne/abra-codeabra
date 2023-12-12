@@ -88,4 +88,98 @@ This project is a collaborative code editor that can be run on Mathlan.
   </li>
 </ul>
 
+## example usage
+<ol>
+  <li>Amani wants to host an editing session for her lab, <code>some213.c</code>. She is on the computer wilkinson.grinnell.cs.edu</li> <li>She runs the program using the command line arguments, <code>./main amani /home/csc213/labs/some213.c</code>, which is a correct filepath to her <code>some213.c</code> lab
+  <ol>
+    <li><code>some213.c</code> is a pretty short file, 40 lines long exactly, and none of the lines are over 100 characters</li>
+    <li>The program renders all 40 lines of <code>some213.c</code> with their appropriate line numbers</li>
+    <li>Above the rendering of the line numbers, there's a username line that says the port number to connect to Amani with. Let's call it 59846</li>
+  </ol>
+  </li>
+  <li>Amani wants to edit line 37 of the file, so she types 37 on the line number prompt
+    <ol>
+      <li>An asterisk appears next to line 37, indicating that the line is use by someone.
+        <ul> <li>And it is! It is in use by Amani!</li></ul>
+      </li>
+    </ol>
+  </li>
+  <li>While Amani is typing her content in the Contents prompt, one of Amani's lab partners, Istar, joins the session, by using the command line arguments <code>./main istar wilkinson.grinnell.cs.edu 59846</code> 
+    <ol><li>Istar renders the same code Amani has, and the asterisk already appears at line 37</li></ol>
+  </li>
+  <li>Istar claims line 15, and an asterisk appears there too, on both Istar and Amani's screen</li>
+  <li>Amani types her contents for line 37, a comment that says "//what", and then that is loaded to line 37 on everyone's screen, and the file itself.
+  <ol>
+    <li>The asterisk is replaced by a space, to denote that the line is no longer in use.</li>
+  </ol>
+  </li>
+  <li>Istar types her contents for line 15, it's renaming an int pointer from "ptr" to "int_ptr"
+    <ol>
+      <li>This change is printed to everyone's screens, and through the host, gets written to the file</li>
+      <li>The asterisk also changes to a space, seeing as the line is no longer in use</li>
+    </ol>
+  </li>
+  <li>The third lab partner, Ellie, now also joins the editing session, using the command line arguments <code>./main ellie wilkinson.grinnell.cs.edu 59846</code>
+    <ol>
+      <li>It renders all the contents, including the changes Istar and Amani have made </li>
+      <li>At this point, no lines are claimed, so there are all spaces and no asterisks to the left of all the line numbers</li>
+    </ol>
+  </li>
+  <li>More miscellaneous changes are made as the group works on the lab. Imagine a groupwork montage here. Now, skip ahead in time to a moment where Ellie has line 6 claimed, Amani has line 5 claimed, and Istar has nothing claimed. There's a big bug on line 7 in the file, so they ask Prof. Perlmutter for help with their lab, in a kind of office hours sort of scenario. Professor Perlmutter joins the editing session with the command line <code>./main leah wilkinson.grinnell.cs.edu 59846</code></li>
+  <li>Oh no! The troubles of sychronous editing have occured. In an attempt to fix the bug, people all try to claim line 7. 
+    <ol>
+      <li>In order, Ellie tries to claim it
+        <ul><li>There is now an asterisk beside line 7 on everyone's screen</li></ul>
+      </li>
+      <li>Then Istar tries to claim it
+        <ul><li>The asterisk looks the same as before, it indicates if there's someone there, not how many people</li></ul>
+      </li>
+      <li>Then Leah tries to claim it
+        <ul><li>The asterisk looks the same as before, it indicates if there's someone there, not how many people</li></ul>
+      </li>
+        <li>Then Amani tries to claim it
+        <ul><li>The asterisk looks the same as before, it indicates if there's someone there, not how many people</li></ul>
+      </li>
+    </ol>
+  </li>
+<li>Now having all entered (and marked as using) line 7, they push the changes that try to fix the bug.
+  <ol>
+    <li>Istar pushes her changes first
+      <ul><li>Her changes show up on everyone's screen</li></ul>
+      <ul><li>There is still an asterisk next to line 7 because the line is still in use by others</li></ul>
+    </li>
+    <li>Ellie pushes their changes next
+      <ul><li>Their changes show up on everyone's screen, overwriting those Istar just did. Sorry Istar!</li></ul>
+      <ul><li>There is still an asterisk next to line 7 because the line is still in use by others</li></ul>
+    </li>
+    <li>Prof Perlmutter pushes her changes next
+      <ul><li>Her changes show up on everyone's screen, overwriting those Ellie just did. Sorry Ellie!</li></ul>
+      <ul><li>There is still an asterisk next to line 7 because the line is still in use by others</li></ul>
+    </li>
+      <li>Amani pushes her changes next
+      <ul><li>Her changes show up on everyone's screen, overwriting those Prof Perlmutter just did. Sorry Professor Perlmutter!</li></ul>
+      <ul><li>There is no longer an asterisk next to line 7 because the line isn't in use by anyone anymore</li></ul>
+    </li>
+  </ol>
+</li>
+<li>Somehow, throughout all of this chaos, the bug did actually get fixed, so Prof Perlmutter doesn't need to be here anymore.
+  <ol>
+  <li>By typing :q where the line number would have otherwise gone, she is able to quit the program</li>
+  <li>It clears her screen and exits curses mode, so she can use her terminal normally again</li>
+  <li>Because she is a client, not the host, this does not impact the other users at all</li>
+  </ol>
+</li>Amani has a meeting to go to, so she needs to leave too.
+  <li>By typing :q where the line number would have otherwise gone, she is able to quit the program</li>
+  <li>It clears her screen and exits curses mode, so she can use her terminal normally again</li>
+  <li>Because she is the host, this has an impact on the two remaining clients, Istar and Ellie.
+    <ul><li>The next time Ellie or Istar give an input, if it is content, it won't write anywhere, and the next time they input a line number, instead of claiming that line, their window will be cleared and replaced with a message saying that the host has ended the session and they no longet have document access
+      <ul>
+      <li>This message will hang out for five seconds and then be dismissed, leaving their terminals free for normal use.</li>
+      <li>They will each experience this behavior separately, based on their own inputs, not each others'.</li>
+      </ul>
+    </li> </ul>
+  </li>
+  </ol>
+</ol>
+
 
