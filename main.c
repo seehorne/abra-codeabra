@@ -657,6 +657,10 @@ void* add_user(void* arg){ //get socket out of arg
 }
 
 int main(int argc, char **argv){
+    if(argc != HOST_RUN && argc !=CLIENT_RUN){
+        fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>\n", argv[0], argv[0]);
+        return -1; //don't run the program
+    }
     ui_win = initscr();
     keypad(ui_win, true);   // Support arrow keys
     //ui_init(input_callback);
@@ -665,7 +669,6 @@ int main(int argc, char **argv){
     fflush(log_f);
     log_f2 = fopen("log2.txt", "w+");
     fflush(log_f2);
-
     bool pre_existing = true;
     our_file = malloc(sizeof(file_rep_t));//gets freed
     real_file = malloc(sizeof(locking_file_t));//gets freed
@@ -682,9 +685,6 @@ int main(int argc, char **argv){
     if (listen(server_socket_fd, 1)) {
         perror("listen failed"); 
         exit(EXIT_FAILURE);
-    }
-    if(argc != HOST_RUN && argc !=CLIENT_RUN){
-        fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>]\n", argv[0], argv[0]);
     }
     if (argc == HOST_RUN){ //setup for session host. run program, username, and filename
         username = argv[1];
@@ -812,7 +812,7 @@ int main(int argc, char **argv){
         //prompt user to input the line num
         // mvaddstr(1, 0, "Line #: "); 
         // wrefresh(ui_win);
-        close_time = overwrite_line(argc); //run until we exit normally
+        close_time = overwrite_line(argc); //run until we exit normally or get the code for host leaving
         //pthread_mutex_unlock(&lock);
         if (close_time == -5 && argc == CLIENT_RUN){
           wclear(ui_win);
