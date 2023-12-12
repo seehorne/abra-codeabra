@@ -181,7 +181,8 @@ This project is a collaborative code editor that can be run on Mathlan.
   </ol>
 </li>
   
-</li>Amani has a meeting to go to, so she needs to leave too.
+<li>Amani has a meeting to go to, so she needs to leave too.
+  <ol>
   <li>By typing :q where the line number would have otherwise gone, she is able to quit the program</li>
   <li>It clears her screen and exits curses mode, so she can use her terminal normally again</li>
   <li>Because she is the host, this has an impact on the two remaining clients, Istar and Ellie.
@@ -195,5 +196,6 @@ This project is a collaborative code editor that can be run on Mathlan.
   </li>
   </ol>
 </ol>
+</li>
 
 
