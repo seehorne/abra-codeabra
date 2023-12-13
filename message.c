@@ -6,123 +6,89 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#define MAX_LINE_LENGTH 101 //100 chars plus a newline
+
+#define MAX_LINE_LENGTH 101 // 100 chars plus a newline
 #define MAX_LINE_COUNT 40
 
-//structure for a file line, contents char[], int to represent who owns it
+// Structure for a file line, contents char[], int to represent who owns it
 typedef struct file_line {
     char line_contents[MAX_LINE_LENGTH];
-    int owner; //which thread is currently holding it, -1 means unheld
+    int owner; // which thread is currently holding it, -1 means unheld
 } file_line_t;
 
-//data structure representing the contents of a file
+// Data structure representing the contents of a file
 typedef struct file_rep {
     file_line_t contents[MAX_LINE_COUNT];
-}file_rep_t;
+} file_rep_t;
 
-// Send a across a socket with a header that includes the message length.
+// Send a message across a socket with a header that includes the message length.
 int send_message(int fd, char* message) {
-  // If the message is NULL, set errno to EINVAL and return an error
-  if (message == NULL) {
-    errno = EINVAL;
-    return -1;
-  }
+    // If the message is NULL, set errno to EINVAL and return an error
+    if (message == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
 
-  // First, send the length of the message in a size_t
-  size_t len = strlen(message);
-  if (write(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
-    // Writing failed, so return an error
-    return -1;
-  }
+    // First, send the length of the message in a size_t
+    size_t len = strlen(message);
+    if (write(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
+        // Writing failed, so return an error
+        return -1;
+    }
 
-  // Now we can send the message. Loop until the entire message has been written.
-  size_t bytes_written = 0;
-  while (bytes_written < len) {
-    // Try to write the entire remaining message
-    ssize_t rc = write(fd, message + bytes_written, len - bytes_written);
+    // Now we can send the message. Loop until the entire message has been written.
+    size_t bytes_written = 0;
+    while (bytes_written < len) {
+        // Try to write the entire remaining message
+        ssize_t rc = write(fd, message + bytes_written, len - bytes_written);
 
-    // Did the write fail? If so, return an error
-    if (rc <= 0) return -1;
+        // Did the write fail? If so, return an error
+        if (rc <= 0) return -1;
 
-    // If there was no error, write returned the number of bytes written
-    bytes_written += rc;
-  }
+        // If there was no error, write returned the number of bytes written
+        bytes_written += rc;
+    }
 
-  return 0;
+    return 0;
 }
-
-// // Send a across a socket with a header that includes the message length.
-// int send_file(int fd, void* file_rep) {
-//   file_rep_t* file = (file_rep_t*) file_rep;//unpack the void*
-//   // If the message is NULL, set errno to EINVAL and return an error
-//   if (file == NULL) {
-//     errno = EINVAL;
-//     return -1;
-//   }
-
-//   // First, send the length of the message in a size_t
-//   size_t len = strlen(file_rep);//hmmmm
-//   if (write(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
-//     // Writing failed, so return an error
-//     return -1;
-//   }
-
-//   // Now we can send the message. Loop until the entire message has been written.
-//   size_t bytes_written = 0;
-//   while (bytes_written < len) {
-//     // Try to write the entire remaining message
-//     ssize_t rc = write(fd, message + bytes_written, len - bytes_written);
-
-//     // Did the write fail? If so, return an error
-//     if (rc <= 0) return -1;
-
-//     // If there was no error, write returned the number of bytes written
-//     bytes_written += rc;
-//   }
-
-//   return 0;
-// }
-
-
 
 // Receive a message from a socket and return the message string (which must be freed later)
 char* receive_message(int fd) {
-  // First try to read in the message length
-  size_t len;
-  if (read(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
-    // Reading failed. Return an error
-    
-    return NULL;
-  }
-
-  // Now make sure the message length is reasonable
-  if (len > MAX_MESSAGE_LENGTH) {
-    errno = EINVAL;
-    return NULL;
-  }
-
-  // Allocate space for the message and a null terminator
-  char* result = malloc(len + 1);
-
-  // Try to read the message. Loop until the entire message has been read.
-  size_t bytes_read = 0;
-  while (bytes_read < len) {
-    // Try to read the entire remaining message
-    ssize_t rc = read(fd, result + bytes_read, len - bytes_read);
-
-    // Did the read fail? If so, return an error
-    if (rc <= 0) {
-      printf("this is our mistake\n");
-      free(result);
-      return NULL;
+    // First try to read in the message length
+    size_t len;
+    if (read(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
+        // Reading failed. Return an error
+        return NULL;
     }
 
-    // Update the number of bytes read
-    bytes_read += rc;
-  }
+    // Now make sure the message length is reasonable
+    if (len > MAX_MESSAGE_LENGTH) {
+        errno = EINVAL;
+        return NULL;
+    }
 
-  // Add a null terminator to the message
-  result[len] = '\0';
+    // Allocate space for the message and a null terminator
+    char* result = malloc(len + 1);
 
-  return result;
+    // Try to read the message. Loop until the entire message has been read.
+    size_t bytes_read = 0;
+    while (bytes_read < len) {
+        // Try to read the entire remaining message
+        ssize_t rc = read(fd, result + bytes_read, len - bytes_read);
+
+        // Did the read fail? If so, return an error
+        if (rc <= 0) {
+            printf("this is our mistake\n");
+            free(result);
+            return NULL;
+        }
+
+        // Update the number of bytes read
+        bytes_read += rc;
+    }
+
+    // Add a null terminator to the message
+    result[len] = '\0';
+
+    return result;
 }
