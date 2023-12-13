@@ -66,14 +66,16 @@ typedef struct thread_file_package{
     uint8_t port_num;
 } thread_file_package_t;
 
-typedef struct info_passing{
-  int port;
-  int argc;
+// Define a structure for basic information passing
+typedef struct info_passing {
+  int port;  // Port number for communication
+  int argc;  // Number of command-line arguments
 } info_passing_t;
 
-typedef struct extended_info_passing{
-  info_passing_t info;
-  char** argv;
+// Define a structure for extended information passing
+typedef struct extended_info_passing {
+  info_passing_t info;  // Basic information structure
+  char** argv;          // Array of command-line argument strings
 } extended_info_passing_t;
 
 file_rep_t* our_file; //global struct to contain the file representation
@@ -82,8 +84,15 @@ locking_file_t* real_file; //global struct to contain the actual file
 
 WINDOW* ui_win;
 
-//int string_to
-
+/**
+ * Converts an integer to a string.
+ * 
+ * This function works for both client and server applications.
+ * It allocates memory for a character array to store the result.
+ * 
+ * @param i The integer to be converted.
+ * @return A dynamically allocated string representing the integer.
+ */
 char* int_to_string(int i){//works for client and server
     char* return_val = malloc((sizeof(char)*2));
     int tens_place = i / 10;
@@ -102,7 +111,16 @@ char* int_to_string(int i){//works for client and server
     return return_val;
 }
 
-
+/**
+ * Writes the contents of the file to the UI.
+ *
+ * This function works for both client and server applications.
+ * It clears the designated area on the UI, writes line numbers,
+ * and displays the contents of the file line by line.
+ * 
+ * @param argc An integer indicating the mode of execution (CLIENT_RUN or SERVER_RUN).
+ *             Used to determine whether to display line claim indicators for the client.
+ */
 void write_contents(int argc){//works for client and server
     int row = 1;
     int col = 0;
@@ -123,16 +141,11 @@ void write_contents(int argc){//works for client and server
         mvaddch(row, 1, line_num[0]);
         mvaddch(row, 2, line_num[1]);
         mvaddch(row, 3, ' ');
-        // if (row < 10){
-        //     mvaddch(row, 0, (row-'0'));
-        // }
-        // else{
-        //     mvaddch(row, 0, 'X');
-        // }
+        
         for (col = 4; col <= MAX_LINE_LENGTH+ 3; col++){
         mvaddch(row, col, our_file->contents[row-2].line_contents[col-4]);
         }
-        //refresh();
+        
         wrefresh(ui_win);
         free(line_num);
     }
@@ -140,7 +153,20 @@ void write_contents(int argc){//works for client and server
     refresh();
 }
 
-//TODO: this might crash, check it
+/**
+ * Distributes a message to all connected clients.
+ *
+ * This function is designed for both the host and clients. The host sends the message
+ * to all clients, and clients forward the message to other clients. If the provided
+ * line number representation or message is null, or if the client is no longer connected,
+ * the function removes the client from the list of connected clients.
+ * 
+ * @param client_socket_fd The file descriptor of the client's socket.
+ * @param message The message to be distributed.
+ * @param line_num_rep The line number representation associated with the message.
+ * @param argc An integer indicating the mode of execution (HOST_RUN or CLIENT_RUN).
+ * @return 0 on success, -1 if there's an error in sending the message.
+ */
 int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc){
   //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
   if(line_num_rep == NULL || message == NULL) { 
@@ -182,12 +208,7 @@ int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc
             pthread_mutex_unlock(&lock);
             exit(EXIT_FAILURE);
           }
-          // if (our_file->contents[line_num-1].num_of_owners > 0){
-          //   rc = send_message(temp->data, "*");
-          // }
-          // else{
-          //   rc = send_message(temp->data, " ");
-          // }
+        
           rc = send_message(temp->data, message);
           if(rc == -1) {
             perror("Failed to send message to client");
@@ -204,7 +225,19 @@ int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc
   return 0; //0 on success
 }
 
-
+/**
+ * Overwrites a specific line in the file and distributes the changes to connected clients.
+ *
+ * This function is designed for the server only. It prompts the user to enter a line number,
+ * then collects the new content for that line. The function updates the file representation
+ * and the actual file on the server. It also sends the changes to connected clients if the
+ * server is in HOST_RUN mode. If the server is in CLIENT_RUN mode, it sends the changes to
+ * the host. The function ensures proper synchronization using mutex locks.
+ * 
+ * @param argc An integer indicating the mode of execution (HOST_RUN or CLIENT_RUN).
+ * @return 0 on success, -1 if there's an error in sending the message, -2 if the line number
+ *         is too large, -3 if there's an error in converting the line number, -5 if the host has left.
+ */
 int overwrite_line(int argc){//works for server only
   char line_num_rep[3];//make a char array of 2 slots for storing the line number
   line_num_rep[2]='\0';
@@ -227,7 +260,8 @@ int overwrite_line(int argc){//works for server only
           i--; // decrement so that the previous character can now be overwritten
           continue;
         }
-        if (i < 2){// making sure there is only two digits
+        if (i < 2)
+        { // making sure there is only two digits
           line_num_rep[i]= (char)c;
           fprintf(log_f, "typecasted char %c \n", (char) c );
           fflush(log_f);
@@ -253,7 +287,6 @@ int overwrite_line(int argc){//works for server only
     if (line_num > MAX_LINE_COUNT){
       return -2;
     }
-    //IMPELEMENT LATER: Let user know they put a something other than a number and to try again.
     if (line_num == 0){
       return -3; //atoi error
     }
@@ -273,29 +306,24 @@ int overwrite_line(int argc){//works for server only
         return -5; //error code for host left
       }
       int rc = send_message(users->head->data, line_num_rep);
-      // if (rc == -1){
-      //   return -5; //error code for host left
-      // }
+    
     }
 
     mvaddch(line_num+2, 0, '*'); //print the astrisk to show line number claimed
     wrefresh(ui_win);
     move(1,10);
     wrefresh(ui_win);
-    // }else if (argc == CLIENT_RUN){
-    //   send_message(users->head->data, line_num_rep); // send the line number to host
-    // }
-    //TODO: set the owner field of the line here
+    
     fprintf(log_f, "line we read: %d)\n", line_num);
     fflush(log_f);
-    //char overwrite_buf[MAX_LINE_LENGTH-1];
+    
     clrtoeol(); // clears what was typed on input line after input is entered
 
     //prompt user to input the contents
     mvaddstr(1, 0, "Contents: "); 
     wrefresh(ui_win);
 
-    int overwriting = getch();//works fine
+    int overwriting = getch();
     i = 0; //reset the index overwriter
 
     // loop to collect what they want to write to this line (collecting character by character)
@@ -312,9 +340,6 @@ int overwrite_line(int argc){//works for server only
         }
         if (i < MAX_LINE_LENGTH-1){ // enforcing the 100 character per line limit  
             our_file->contents[line_num].line_contents[i]= (char)overwriting;// store the character in the file representation
-            // overwrite_buf[i]=overwriting;
-            // fprintf(log_f, "new buffer content new: %c\n", overwriting);
-            // fflush(log_f);
         }
         i++;
         fprintf(log_f, "reading char: %c\n", our_file->contents[line_num].line_contents[i]);//fprintf for log_f file
@@ -388,16 +413,7 @@ int overwrite_line(int argc){//works for server only
       if (users->head == NULL){//the host has left
         return -5; //error code for host left
       }
-      // if (rc == -1){
-      //   return -5; //error code for host left
-      // }
       send_message(users->head->data, our_file->contents[line_num].line_contents);
-      // if (users->head == NULL){//the host has left
-      //   return -5; //error code for host left
-      // }
-      // if (rc == -1){
-      //   return -5; //error code for host left
-      // }
     }
     
     //HOST & CLIENT: Print the new changes to personal screens
@@ -450,10 +466,6 @@ void* recieve_and_distribute(void* arg){
     if (argc==HOST_RUN && newly_launched==true){
       int rc;
       for (int i = 0; i< MAX_LINE_COUNT; i++){
-        // if (i == 0){
-        //   rc = send_message(client_socket_fd, buffer);
-        // }
-        //else{
       if (our_file->contents[i].num_of_owners == 0){
         rc = send_message(client_socket_fd, " ");
       }
@@ -487,10 +499,6 @@ void* recieve_and_distribute(void* arg){
           fprintf(log_f2, "I'm a client: didn't read/recieve the message ):\n");
           fflush(log_f2);
         }
-        // else if (j==MAX_LINE_COUNT){
-        //   memcpy(buffer,message,strlen(message));//last message 
-        //   mvaddstr(0, 0, buffer); //write this to the very top line
-        // }
         else{
           claim_indicators[j] = malloc(strlen(claimed));//will get freed
           memcpy(claim_indicators[j],claimed,strlen(claimed));//2 for the char and the null terminator
@@ -527,7 +535,7 @@ void* recieve_and_distribute(void* arg){
         int ycoor = getcury(ui_win);
         pthread_mutex_unlock(&lock);
         mvaddch(line_num+1, 0, '*'); //print the astrisk to show line number claimed
-        //wrefresh(ui_win);
+       
         move(ycoor,xcoor);
         wrefresh(ui_win);
       }
@@ -557,7 +565,7 @@ void* recieve_and_distribute(void* arg){
         int ycoor = getcury(ui_win);
         pthread_mutex_unlock(&lock);
           mvaddch(line_num+1, 0, ' ');//first char in message here is the usage thing
-          //wrefresh(ui_win);
+          
           move(ycoor,xcoor);
           wrefresh(ui_win);
         }
@@ -597,10 +605,9 @@ void* recieve_and_distribute(void* arg){
       for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
         mvaddch(to_row, col, message[i]);
         i++;
-        //wrefresh(ui_win);
+       
       }
-      // mvaddstr(to_row, 3, message);
-      //wrefresh(ui_win);
+     
       move(ycoor,xcoor);//put the cursor back at the top
       wrefresh(ui_win);
         // This is a thread made by host recieving messages from clients
@@ -663,7 +670,6 @@ int main(int argc, char **argv){
     }
     ui_win = initscr();
     keypad(ui_win, true);   // Support arrow keys
-    //ui_init(input_callback);
     //Set up the log_f file
     log_f = fopen("log.txt", "w+");
     fflush(log_f);
@@ -691,12 +697,10 @@ int main(int argc, char **argv){
         filename = argv[2];
         // send the port 
         char info_message[200];
-        //char buffer[100];
+        
         sprintf(buffer, "user: %s, type: host, connect with port %d\n", username, port);
         mvaddstr(0, 0, buffer); //write this to the very top line
         fflush(log_f);
-        // TODO:  ncurses 
-        // O_CREAT | O_RDWR| O_EXCL
         // read the specified file into the data structure
         chmod(filename, 00777);//set rwx to good for everyone (if it exists, this doesn't do anything otherwise)
         real_file->file_ref = fopen(filename, "r+");//tries to open the file (does not overwrite)
@@ -704,7 +708,6 @@ int main(int argc, char **argv){
             pre_existing = false;
             real_file->file_ref = fopen(filename, "w+"); //create the file if it doesn't exist which it doesn't
         }
-        //printf("did not crash trying to r+x open the file\n");
         //when we launch threads, we probably want the void* to include the global file_rep as well
         char put_this;
         for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
@@ -742,20 +745,7 @@ int main(int argc, char **argv){
             }
         }
         fseek(real_file->file_ref, 0, SEEK_SET); //puts the pointer back at the start of the file
-        // WINDOW* mainwin = initscr();
-        // fclose(real_file->file_ref);
-        // if (mainwin == NULL) {
-        //     fprintf(stderr, "Error initializing ncurses.\n");
-        //     exit(2);
-        // }
-        // printw("Hello world!");
-        // refresh();
-        // for (int i = 0; i < MAX_LINE_COUNT; i++){
-        //     printw("|\n");
-        //     refresh();
-        // }
-        // sleep(1000);
-        // endwin();
+   
         info_passing_t args;
         args.port = server_socket_fd;
         args.argc= argc;
@@ -773,7 +763,6 @@ int main(int argc, char **argv){
         wrefresh(ui_win);
     }
     if (argc == CLIENT_RUN){//connecting to editing session
-        //TODO: set up connection
         // Unpack arguments
         char* peer_hostname = argv[2];
         unsigned short peer_port = atoi(argv[3]);
@@ -795,25 +784,14 @@ int main(int argc, char **argv){
             exit(EXIT_FAILURE);
         }
     }
-    //ui_init(ui_win);
-    //nodelay(ui_win, true);  // Non-blocking keyboard access
-    //mousemask(ALL_MOUSE_EVENTS, NULL); //listen to all the stuff a mouse can do
-    // pthread_mutex_lock(&lock);
-    // write_contents();
-    // pthread_mutex_unlock(&lock);
-    //draw_form();
 
     
     int close_time = overwrite_line(argc);
     while (close_time != 0){
-      //pthread_mutex_lock(&lock);
         clrtoeol(); // clears what was typed on input line after input is entered
         wrefresh(ui_win);
         //prompt user to input the line num
-        // mvaddstr(1, 0, "Line #: "); 
-        // wrefresh(ui_win);
         close_time = overwrite_line(argc); //run until we exit normally or get the code for host leaving
-        //pthread_mutex_unlock(&lock);
         if (close_time == -5 && argc == CLIENT_RUN){
           wclear(ui_win);
           wrefresh(ui_win);
