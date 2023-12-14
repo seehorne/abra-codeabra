@@ -228,17 +228,16 @@ int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc
 /**
  * Overwrites a specific line in the file and distributes the changes to connected clients.
  *
- * This function is designed for the server only. It prompts the user to enter a line number,
- * then collects the new content for that line. The function updates the file representation
- * and the actual file on the server. It also sends the changes to connected clients if the
- * server is in HOST_RUN mode. If the server is in CLIENT_RUN mode, it sends the changes to
- * the host. The function ensures proper synchronization using mutex locks.
+ * This function prompts the user to enter a line number, then collects the new content for that line. 
+ * The function updates the file representation and the actual file on the server. It also sends the 
+ * changes to connected clients if the server is in HOST_RUN mode. If the server is in CLIENT_RUN mode, 
+ * it sends the changes to the host. The function ensures proper synchronization using mutex locks.
  * 
  * @param argc An integer indicating the mode of execution (HOST_RUN or CLIENT_RUN).
  * @return 0 on success, -1 if there's an error in sending the message, -2 if the line number
  *         is too large, -3 if there's an error in converting the line number, -5 if the host has left.
  */
-int overwrite_line(int argc){//works for server only
+int overwrite_line(int argc){
   char line_num_rep[3];//make a char array of 2 slots for storing the line number
   line_num_rep[2]='\0';
   
