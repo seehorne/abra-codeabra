@@ -47,7 +47,7 @@ This project is a collaborative code editor that can be run on Mathlan.
       </ul>
   </ol></li>
   <li> To leave this program, type :q where you would normally type the line number
-    <ul><li>If you are the session host and you leave, everyone gets kicked out.</li>
+    <ul><li>If you are the session host and you leave, everyone gets kicked out when they next input a line number.</li>
       <li>If you are not the session host, you leaving does not impact the session.</li></ul>
   </li>
 </ul>
@@ -68,7 +68,7 @@ This project is a collaborative code editor that can be run on Mathlan.
     <li>A space indicates the line is not currently in use by any user</li>
   </ul>
   </li>
-  <li>If the host quits, the next time a client gives input, they will recieve a screen saying the host has terminated the session and they no longer have file access
+  <li>If the host quits, the next time a client gives a line number, they will recieve a screen saying the host has terminated the session and they no longer have file access
     <ul>
       <li>This message will persist for 5 seconds, after which the client program will also terminate</li>
     </ul>
