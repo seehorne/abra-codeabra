@@ -90,8 +90,8 @@ WINDOW* ui_win;
  * This function works for both client and server applications.
  * It allocates memory for a character array to store the result.
  * 
- * @param i The integer to be converted.
- * @return A dynamically allocated string representing the integer.
+ * \param i The integer to be converted.
+ * \return A dynamically allocated string representing the integer.
  */
 char* int_to_string(int i){//works for client and server
     char* return_val = malloc((sizeof(char)*2));
@@ -118,7 +118,7 @@ char* int_to_string(int i){//works for client and server
  * It clears the designated area on the UI, writes line numbers,
  * and displays the contents of the file line by line.
  * 
- * @param argc An integer indicating the mode of execution (CLIENT_RUN or SERVER_RUN).
+ * \param argc An integer indicating the mode of execution (CLIENT_RUN or SERVER_RUN).
  *             Used to determine whether to display line claim indicators for the client.
  */
 void write_contents(int argc){//works for client and server
@@ -161,11 +161,11 @@ void write_contents(int argc){//works for client and server
  * line number representation or message is null, or if the client is no longer connected,
  * the function removes the client from the list of connected clients.
  * 
- * @param client_socket_fd The file descriptor of the client's socket.
- * @param message The message to be distributed.
- * @param line_num_rep The line number representation associated with the message.
- * @param argc An integer indicating the mode of execution (HOST_RUN or CLIENT_RUN).
- * @return 0 on success, -1 if there's an error in sending the message.
+ * \param client_socket_fd The file descriptor of the client's socket.
+ * \param message The message to be distributed.
+ * \param line_num_rep The line number representation associated with the message.
+ * \param argc An integer indicating the mode of execution (HOST_RUN or CLIENT_RUN).
+ * \return 0 on success, -1 if there's an error in sending the message.
  */
 int distribute(int client_socket_fd, char* message, char* line_num_rep, int argc){
   //HOST & CLIENTS: Recieve and Distribute to the rest of the clients
@@ -576,37 +576,33 @@ void* recieve_and_distribute(void* arg){
     int row_index = line_num -1; //array place of the line 
     int i = 0;
     if (argc == CLIENT_RUN && strcmp(message," ")==0 ){
-      pthread_mutex_lock(&lock);
+      pthread_mutex_lock(&lock);//before moving, save the current cursor position
       int xcoor = getcurx(ui_win);
       int ycoor = getcury(ui_win);
       pthread_mutex_unlock(&lock);
       mvaddch(to_row, 0, ' ');//first char in message here is the usage thing
       move(ycoor,xcoor);
       wrefresh(ui_win);
-      wrefresh(ui_win);
     }
     else if (argc == CLIENT_RUN && strcmp(message,"*")==0){
-      pthread_mutex_lock(&lock);
+      pthread_mutex_lock(&lock);//before moving, save the current cursor position
       int xcoor = getcurx(ui_win);
       int ycoor = getcury(ui_win);
       pthread_mutex_unlock(&lock);
       mvaddch(to_row, 0, '*');//first char in message here is the usage thing
       move(ycoor,xcoor);
       wrefresh(ui_win);
-      wrefresh(ui_win);
     }
     else{
       memcpy(our_file->contents[row_index].line_contents, message, MAX_LINE_LENGTH-1); //in our data structure, overwrite the line entirely but leave the /n
-      pthread_mutex_lock(&lock);
+      pthread_mutex_lock(&lock);//before moving, save the current cursor position
       int xcoor = getcurx(ui_win);
       int ycoor = getcury(ui_win);
       pthread_mutex_unlock(&lock);
       for (int col = 4; col <= MAX_LINE_LENGTH + 3; col++){
         mvaddch(to_row, col, message[i]);
         i++;
-       
       }
-     
       move(ycoor,xcoor);//put the cursor back at the top
       wrefresh(ui_win);
         // This is a thread made by host recieving messages from clients
@@ -662,6 +658,14 @@ void* add_user(void* arg){ //get socket out of arg
   return NULL; //bc it must return a void*
 }
 
+/**
+* main
+* runs the main body of the program, handles window initialization and closing
+* launches threads
+* \param argc number of command line arguments
+* \param argv command line arguments as strings
+* \returns 0 on success
+**/
 int main(int argc, char **argv){
     if(argc != HOST_RUN && argc !=CLIENT_RUN){
         fprintf(stderr, "Usage: %s <username>  <filepath> OR %s <username> <hostname> <port number>\n", argv[0], argv[0]);
@@ -677,7 +681,7 @@ int main(int argc, char **argv){
     bool pre_existing = true;
     our_file = malloc(sizeof(file_rep_t));//gets freed
     real_file = malloc(sizeof(locking_file_t));//gets freed
-    pthread_mutex_init(&real_file->file_lock, NULL);
+    pthread_mutex_init(&real_file->file_lock, NULL);//initialize the file lock
     
     //Set up a server socket to accept incoming connections
     unsigned short port = 0;
@@ -707,7 +711,6 @@ int main(int argc, char **argv){
             pre_existing = false;
             real_file->file_ref = fopen(filename, "w+"); //create the file if it doesn't exist which it doesn't
         }
-        //when we launch threads, we probably want the void* to include the global file_rep as well
         char put_this;
         for (int file_lines = 0; file_lines < MAX_LINE_COUNT; file_lines++){
             put_this=fgetc(real_file->file_ref);//read the first char of the file, for a starting off place
@@ -731,7 +734,7 @@ int main(int argc, char **argv){
             }
             our_file->contents[file_lines].line_contents[MAX_LINE_LENGTH-1]= '\n';
         }
-        if (pre_existing){
+        if (pre_existing){//if the file already existed
             freopen(filename, "w+", real_file->file_ref);//overwrite it so we can write our data structure to it
         }
         for (int num_lines = 0; num_lines < MAX_LINE_COUNT; num_lines++){
@@ -770,14 +773,16 @@ int main(int argc, char **argv){
             perror("Failed to connect");
             exit(EXIT_FAILURE);
         }
+        pthread_mutex_lock(&lock);
         list_add(my_host);
+        pthread_mutex_unlock(&lock);
         info_passing_t args;
         args.port = users->head->data;
         args.argc= argc;
         extended_info_passing_t arg;
         arg.info = args;
         arg.argv = argv;
-        pthread_t disseminate_thread;
+        pthread_t disseminate_thread; //launch thread to be able to recieve messages and send to host when necessary
         if (pthread_create(&disseminate_thread, NULL, recieve_and_distribute, &arg)) {
             perror("pthread_create failed");
             exit(EXIT_FAILURE);
@@ -786,7 +791,7 @@ int main(int argc, char **argv){
 
     
     int close_time = overwrite_line(argc);
-    while (close_time != 0){
+    while (close_time != 0){//keep accepting inputs until user quits or gets kicked by host leaving 
         clrtoeol(); // clears what was typed on input line after input is entered
         wrefresh(ui_win);
         //prompt user to input the line num
@@ -806,6 +811,7 @@ int main(int argc, char **argv){
     fclose(log_f);
     fclose(log_f2);
     endwin();
+    pthread_mutex_destroy(&real_file->file_lock);
     free(our_file);
     free(real_file);
     for (int i=0; i < MAX_LINE_COUNT; i++){
